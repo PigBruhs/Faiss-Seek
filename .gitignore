@@ -1,3 +1,10 @@
+# 忽略 JetBrains IDE 的配置文件
+.idea/
+
+# 忽略虚拟 python 环境
+.venv/
+
+# 忽略 vscode+vue 环境
 # Logs
 logs
 *.log
@@ -8,6 +15,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.package-lock.json
+.package.json
 .DS_Store
 dist
 dist-ssr
@@ -28,3 +37,17 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+
+# 忽略数据库文件
+# server/test.db
+
+
+# 忽略 py 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 忽略 vue包json
+*.ts
+src/components.d.ts
