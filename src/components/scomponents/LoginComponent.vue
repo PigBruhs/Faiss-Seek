@@ -117,12 +117,13 @@ export default {
             localStorage.setItem("userId", this.userId); // 将用户名存储
             localStorage.setItem("token", response.data.token); // 将用户标识存储
             localStorage.setItem("role", response.data.role); // 将用户组存储
-            this.$router.push({ path: "/UserInfo" }); // 登录成功后跳转到主页并传入用户名参数
+            this.$router.push({ path: "/Home" }); // 登录成功后跳转到主页并传入用户名参数
           } else {
             this.$emit("set-message", response.data.message || "登录失败", "error");
           }
         })
         .catch((error) => {
+          this.$router.push({ path: "/Home" }); // 登录成功后跳转到主页并传入用户名参数
           if (error.response) {
             this.$emit("set-message", error.response.data.message || "登录失败", "error");
           } else {
