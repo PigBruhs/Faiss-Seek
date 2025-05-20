@@ -1,3 +1,5 @@
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import torch
 import torchvision.transforms as transforms
 from torchvision.models import resnet50
@@ -64,7 +66,7 @@ def resnet50_feature_extractor(image_path, max_dim=1024):
 
 # 使用示例 ---------------------------------------------------
 if __name__ == "__main__":
-    features = resnet50_feature_extractor("../data/test/002_anchor_image_0001.jpg")
+    features = resnet50_feature_extractor("../data/search/002_anchor_image_0001.jpg")
 
     # 创建Faiss索引
     dimension = 2048  # ResNet-50特征维度
@@ -74,3 +76,4 @@ if __name__ == "__main__":
     index.add(features)
     print("特征向量已存入Faiss索引，形状：", features.shape)
     print(features)
+
