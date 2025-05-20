@@ -5,8 +5,8 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑
 def compute_index_similarity(index1: faiss.IndexFlatIP, index2: faiss.IndexFlatIP) -> float:
     """
     计算两个 Faiss 索引的相似度（双向平均 Top-1 内积）。
-    参数：
-        index1, index2: faiss.IndexFlatIP，已添加需比较的特征
+    输入：
+        index1, index2: faiss.IndexFlatIP  索引对象
     返回：
         float 类型相似度，范围 [-1, 1]
     """

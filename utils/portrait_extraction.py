@@ -10,9 +10,9 @@ def resnet50_feature_extractor(image_path, max_dim=1024):
     """ResNet-50特征提取函数
     参数：
         image_path: 输入图片路径
-        max_dim: 最大限制尺寸（保持长宽比，防止显存溢出）
+        max_dim: 最大限制尺寸
     返回：
-        faiss兼容的归一化向量（numpy数组）
+        faiss的归一化向量
     """
     # 图像预处理流水线
     preprocess = transforms.Compose([
@@ -43,7 +43,7 @@ def resnet50_feature_extractor(image_path, max_dim=1024):
     )
     feature_extractor.eval()
 
-    # GPU加速（适配RTX 4080S）
+    # GPU加速
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     feature_extractor = feature_extractor.to(device)
     input_tensor = input_tensor.to(device)
@@ -52,7 +52,6 @@ def resnet50_feature_extractor(image_path, max_dim=1024):
     with torch.no_grad():
         features = feature_extractor(input_tensor)
 
-    # 转换为Faiss兼容格式
     features = features.squeeze().cpu().numpy()  # 降维至(2048,)
     features = np.expand_dims(features, axis=0)  # Faiss需要二维输入
 
