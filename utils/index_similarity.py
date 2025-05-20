@@ -1,4 +1,6 @@
 import faiss
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑着两个pytorch导致它报的不安全。实际情况应该不会用到
 # 计算两个特征数组的相似度
 def compute_index_similarity(index1: faiss.IndexFlatIP, index2: faiss.IndexFlatIP) -> float:
     """
@@ -34,13 +36,9 @@ def compute_index_similarity(index1: faiss.IndexFlatIP, index2: faiss.IndexFlatI
 if __name__ == "__main__":
     import portrait_extraction
 
-    index_1 = faiss.IndexFlatIP(2048)
-    index_2 = faiss.IndexFlatIP(2048)
-    index_3 = faiss.IndexFlatIP(2048)
-
-    index_1.add(portrait_extraction.resnet50_feature_extractor("../data/search/002_anchor_image_0001.jpg"))
-    index_2.add(portrait_extraction.resnet50_feature_extractor("../data/base/002_anchor_image_0002.jpg"))
-    index_3.add(portrait_extraction.resnet50_feature_extractor("../data/base/2012_000166.jpg"))
+    index_1 = portrait_extraction.resnet50_feature_extractor("../data/search/002_anchor_image_0001.jpg")
+    index_2 = portrait_extraction.resnet50_feature_extractor("../data/base/002_anchor_image_0002.jpg")
+    index_3 = portrait_extraction.resnet50_feature_extractor("../data/base/2012_000166.jpg")
 
     print(compute_index_similarity(index_1, index_2))
     print(compute_index_similarity(index_1, index_3))
