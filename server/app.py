@@ -15,7 +15,9 @@ def init_db(): #使用数据库建模文件初始化数据库，在命令行中�
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             userId TEXT NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            role TeXT NOT NULL,
+            token TEXT
         );
         '''
     )   
@@ -34,16 +36,18 @@ def register_():
             "message": "请求数据不能为空！"
         }), 400
 
-    else:    # 直接返回前端需要的响应格式
-        if register(data['userId'], data['password']):
+    else:   
+        result=register(data['userId'], data['password']) # 直接返回前端需要的响应格式
+        print("注册数据:",result)
+        if result[0]:
             return jsonify({
                 "success": True,
-                "message": "注册成功！",
+                "message": result[1] 
             }), 200
         else:
             return jsonify({
                 "success": False,
-                "message": "注册失败！请检查用户名和密码！"
+                "message": result[1]
             }), 401
 
 @app.route('/login', methods=['POST'])
@@ -59,11 +63,13 @@ def login_():
 
     else:    # 直接返回前端需要的响应格式
       print(data)#打印接受到的数据，确认数据是什么类型的
-      if login(data['userId'], data['password']):
+      result = login(data['userId'], data['password'])
+      if result[0]:
           print(data)
           return jsonify({
               "success": True,
               "message": "登录成功！",
+              "token": result[1],
               "role": "user",
               "userId": data['userId']
           }), 200

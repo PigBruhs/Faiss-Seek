@@ -2,6 +2,13 @@ from flask import Flask, request, jsonify,g
 from flask_cors import CORS
 import sqlite3
 base_id=0
+def record_exists(conn,table, column, value):
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT {column} FROM {table} WHERE {column} = ?", (value,))
+    exists = cursor.fetchone() is not None
+    return exists
+
+
 def register(userId, password):
     db = sqlite3.connect('database.db')#连接数据库
     cursor = db.cursor()#创建光标
@@ -16,12 +23,17 @@ def register(userId, password):
         new_id = base_id
     else:
         new_id = id[-1][0]+1#新用户的id
-    cursor.execute(
-        """
-        INSERT INTO users (id, userId, password) VALUES (?, ?, ?)
-        """,
-        (new_id, userId, password)
-    )#插入新用户的数据
+    if record_exists(db,"users", "userId",userId):
+        db.close()
+        return False,"用户名已存在！"
+    # print("原有的id:",id) 
+    else:
+        cursor.execute(
+            """
+            INSERT INTO users (id, userId, password,role,token) VALUES (?,?,?,?,?)
+            """,
+            (new_id, userId, password,"user",None)#默认角色为user
+        )#插入新用户的数据
     data = cursor.execute(
         """
         SELECT * FROM users WHERE userId = ? AND password = ?
@@ -30,8 +42,8 @@ def register(userId, password):
     if data is not None:
         db.commit()
         db.close()
-        return True 
+        return True,"注册成功！"
     else:
         db.close()
-        return False
+        return False,"注册失败！请检查用户名和密码！"
     #新用户存在则返回true
