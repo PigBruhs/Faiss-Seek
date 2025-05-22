@@ -4,10 +4,20 @@ import os
 import sqlite3
 from login import login
 from register import register
+from werkzeug.utils import secure_filename
 app = Flask(__name__)
 CORS(app)
 users_db = {}#数据库连接函数
+UPLOAD_ADDRESS = 'data/upload'
+app.config['UPLOAD_ADDRESS'] = UPLOAD_ADDRESS
+if not os.path.exists(UPLOAD_ADDRESS):
+    os.makedirs(UPLOAD_ADDRESS)
 
+def cnnect_db():
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+    return db
 
 def init_db(): #使用数据库建模文件初始化数据库，在命令行中使用一次即可。
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
@@ -82,6 +92,36 @@ def login_():
                 "success": False,
                 "message": "登录失败！请检查用户名和密码！"
             }), 401
+
+@app.route('/match', methods=['POST']) 
+def match():
+    # 打印接收到的原始数据
+    data = request.get_json()
+    print("收到匹配请求数据:", data)
+    if not data:
+        return jsonify({
+            "success": False,
+            "message": "请求数据不能为空！"
+        }), 400
+    else:   
+        file = request.files.get('file')
+        filename= secure_filename(file.filename)
+        file_path = os.path.join(UPLOAD_ADDRESS,filename)
+        file.save(file_path)
+        if os.path.exists(file_path):
+            print("文件存在,路径为",file_path,"文件名为：",filename)
+        if file:
+            return jsonify({
+                "success": True,
+                "message": "图片接受成功"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "message": "图片接受失败"
+            }), 400
+        
+
 
 @app.before_request#请求前处理函数，通过g这个变量存储数据库连接
 def before_request():

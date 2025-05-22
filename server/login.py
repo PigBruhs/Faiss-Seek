@@ -32,6 +32,8 @@ def login(userId, password):
         )
         print("登录成功，生成的token:",token)
         db.commit()
+        db.close()
+        #返回登录成功的结果 
         return True ,token
     else:
         print("登录失败")
