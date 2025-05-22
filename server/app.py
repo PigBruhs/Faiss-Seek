@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify,g
 from flask_cors import CORS
+import os
 import sqlite3
 from login import login
 from register import register
@@ -9,7 +10,9 @@ users_db = {}#数据库连接函数
 
 
 def init_db(): #使用数据库建模文件初始化数据库，在命令行中使用一次即可。
-    db = sqlite3.connect('database.db')#连接数据库
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)  # 如果文件夹不存在，则创建
+    db = sqlite3.connect(db_path)  # 连接数据库
     db.cursor().execute(
         '''
         CREATE TABLE IF NOT EXISTS users (
@@ -22,6 +25,7 @@ def init_db(): #使用数据库建模文件初始化数据库，在命令行中�
         '''
     )   
     db.commit(),
+    
 
 
 @app.route('/register', methods=['POST'])
@@ -88,4 +92,5 @@ def teardown_request(exception):#请求后处理函数，关闭数据库
    pass
 
 if __name__ == '__main__':
+    init_db()#初始化数据库
     app.run(host= "0.0.0.0",port=19198, debug=True)

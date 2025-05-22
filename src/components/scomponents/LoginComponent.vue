@@ -96,41 +96,43 @@ export default {
     },
     // 提交登录
     submitLogin() {
-      this.validateUserId();
-      this.validatePassword();
-      if (this.userIdError || this.passwordError) {
-        this.$emit("set-message", "请检查输入的用户名和密码", "error");
-        return;
+  this.validateUserId();
+  this.validatePassword();
+  if (this.userIdError || this.passwordError) {
+    this.$emit("set-message", "请检查输入的用户名和密码", "error");
+    return;
+  }
+
+  const loginData = {
+    userId: this.userId,
+    password: this.password,
+  };
+
+  axios
+    .post("http://localhost:19198/login", loginData)
+    .then((response) => {
+      if (response.data && response.data.success) {
+        this.$emit("set-message", "登录成功！", "success");
+
+        // 将返回的数据存储到本地
+        localStorage.setItem("userId", response.data.userId); // 用户名
+        localStorage.setItem("token", response.data.token);   // 用户身份标识
+        localStorage.setItem("role", response.data.role);     // 用户角色
+
+        // 跳转到主页
+        this.$router.push({ path: "/Home" });
+      } else {
+        this.$emit("set-message", response.data.message || "登录失败", "error");
       }
-
-      const loginData = {
-        userId: this.userId,
-        password: this.password,
-      };
-
-      axios
-        .post("http://localhost:19198/login", loginData)
-        .then((response) => {
-          if (response.data && response.data.success) {
-            this.$emit("set-message", "登录成功！", "success");
-            response.data.userId = this.userId; // 获取用户名
-            localStorage.setItem("userId", this.userId); // 将用户名存储
-            localStorage.setItem("token", response.data.token); // 将用户标识存储
-            localStorage.setItem("role", response.data.role); // 将用户组存储
-            this.$router.push({ path: "/Home" }); // 登录成功后跳转到主页并传入用户名参数
-          } else {
-            this.$emit("set-message", response.data.message || "登录失败", "error");
-          }
-        })
-        .catch((error) => {
-          this.$router.push({ path: "/Home" }); // 登录成功后跳转到主页并传入用户名参数
-          if (error.response) {
-            this.$emit("set-message", error.response.data.message || "登录失败", "error");
-          } else {
-            this.$emit("set-message", "网络错误，请稍后重试", "error");
-          }
-        });
-    },
+    })
+    .catch((error) => {
+      if (error.response) {
+        this.$emit("set-message", error.response.data.message || "登录失败", "error");
+      } else {
+        this.$emit("set-message", "网络错误，请稍后重试", "error");
+      }
+    });
+  },
     // 新增方法：处理回车事件
     handleEnterKey(event, field) {
       if (event.key === 'Enter') { 

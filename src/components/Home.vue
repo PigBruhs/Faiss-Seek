@@ -1,6 +1,10 @@
 <template>
-    <div class="background" style="font-family: 'MyFont';">
-        <HeaderTopAfterLogin />
+    <div class="background">
+        <HeaderTopAfterLogin
+    :userId="userId"
+    :role="role"
+    @logout="logout"
+/>
         <div v-if="message" class="message-box" :class="messageType">
                     {{ message }}
         </div>
@@ -29,9 +33,17 @@ export default {
             imageFile: null,
             imageUrl: null,
             imageList: [], // 用于存储后端返回的图片列表
+            userId: "",
         };
     },
     methods: {
+        logout() {
+      localStorage.removeItem("token"); // 清除 token
+      localStorage.removeItem("userId"); // 清除用户 ID
+      localStorage.removeItem("role"); // 清除用户组
+      this.updateUserId(); // 更新用户信息
+      this.$router.push({ path: "/Login" }); // 跳转到登录页面
+    },
         setMessage(content, type) {
             this.$emit("set-message", content, type);
         },
@@ -64,6 +76,16 @@ export default {
                 this.$emit("set-message", "图片获取失败", "error");
             }
         },
+    },
+    mounted(){
+        this.userId = localStorage.getItem("userId") || "未知"; // 从 localStorage 获取 userId
+    // 检查用户是否登录
+    if (!localStorage.getItem("token")) {
+        this.$router.push({ path: "/Login" });
+    }
+    console.log("用户ID:", this.userId);
+    console.log("用户角色:", localStorage.getItem("role"));
+    console.log("图片列表:", this.imageList);
     },
 };
 </script>

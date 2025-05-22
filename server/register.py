@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify,g
 from flask_cors import CORS
 import sqlite3
+import os
 base_id=0
 def record_exists(conn,table, column, value):
     cursor = conn.cursor()
@@ -10,7 +11,9 @@ def record_exists(conn,table, column, value):
 
 
 def register(userId, password):
-    db = sqlite3.connect('database.db')#连接数据库
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)  # 如果文件夹不存在，则创建
+    db = sqlite3.connect(db_path)  # 连接数据库
     cursor = db.cursor()#创建光标
     cursor_id = cursor.execute(
         """
