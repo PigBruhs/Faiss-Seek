@@ -30,6 +30,7 @@ export default {
             imageUrl: null,
             imageList: [], // 用于存储后端返回的图片列表
             userId: "",
+            role:"",
         };
     },
     methods: {
@@ -59,7 +60,6 @@ export default {
             if (!this.imageFile) return;
             const formData = new FormData();
             formData.append("image", this.imageFile);
-
             try {
                 // 获取 token
                 const token = localStorage.getItem("token");
@@ -78,6 +78,7 @@ export default {
                 this.$emit("set-message", "图片获取失败", "error");
             }
         },
+        
         async checkTokenValidity() {
             const token = localStorage.getItem("token");
             if (!token) {
@@ -86,7 +87,7 @@ export default {
             }
             try {
                 const response = await axios.get("http://localhost:19198/protected", {
-                    headers: { Authorization: token },
+                    headers: { Authorization: `Bearer ${token}` },
                 });
 
                 // 根据 response.data.success 判断
@@ -114,7 +115,8 @@ export default {
         }
     },
     mounted() {
-        this.userId = localStorage.getItem("userId") || "未知"; // 从 localStorage 获取 userId
+        this.role = localStorage.getItem("role") || "user"; // 从 localStorage 获取用户组
+        this.userId = localStorage.getItem("userId") || "未知用户"; // 从 localStorage 获取 userId
         // 检查用户是否登录
         if (!localStorage.getItem("token")) {
             this.$router.push({ path: "/Login" });

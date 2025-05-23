@@ -1,15 +1,19 @@
 from flask import Flask, request, jsonify,g
 from flask_cors import CORS
+import sys
 import os
 import sqlite3
+import faiss
+
 from login import login
 from register import register
 from werkzeug.utils import secure_filename
+from typing import Dict
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
-import sys
-sys.path.append("..")
-from utils import load_index_base,search_topn
+from utils.index_base import load_index_base
+from utils.index_search import search_topn
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 CORS(app)
@@ -18,6 +22,22 @@ UPLOAD_ADDRESS = 'data/upload'
 app.config['UPLOAD_ADDRESS'] = UPLOAD_ADDRESS
 if not os.path.exists(UPLOAD_ADDRESS):
     os.makedirs(UPLOAD_ADDRESS)
+
+def load_index_base(index_folder: str) -> Dict[str, faiss.IndexFlatIP]:
+    """
+    扫描 index_folder 下所有 .index 文件，加载为 Faiss 索引，并以文件名(不含扩展)为 key 返回。
+    输入：
+        index_folder: 索引文件夹路径
+    返回：
+        Dict[str, faiss.IndexFlatIP], 文件名到索引的字典
+    """
+    indices: Dict[str, faiss.IndexFlatIP] = {}
+    for file in os.listdir(index_folder):
+        if file.lower().endswith(".index"):
+            name, _ = os.path.splitext(file)
+            path = os.path.join(index_folder, file)
+            indices[name] = faiss.read_index(path)
+    return indices
 
 def cnnect_db():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
@@ -42,7 +62,36 @@ def init_db(): #使用数据库建模文件初始化数据库，在命令行中�
     )   
     db.commit(),
     
+@app.route('/protected', methods=['GET'])
+def protected():
+    # 检查 Authorization 请求头
+    auth_header = request.headers.get('Authorization')
+    print("Authorization:", auth_header)
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({
+            "success": False,
+            "message": "缺少或无效的 Token"
+        }), 401
 
+    token = auth_header.split(" ")[1]  # 提取 Token
+    # 验证 Token（示例代码，实际需要根据你的逻辑验证 Token）
+    db = cnnect_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE token = ?", (token,))
+    user = cursor.fetchone()
+    db.close()
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+
+    # 如果 Token 验证成功
+    return jsonify({
+        "success": True,
+        "message": "Token 验证成功"
+    }), 200
 
 @app.route('/register', methods=['POST'])
 def register_():
@@ -99,35 +148,98 @@ def login_():
                 "message": "登录失败！请检查用户名和密码！"
             }), 401
 
-@app.route('/match', methods=['POST']) 
+# @app.route('/match', methods=['POST']) 
+# def match():
+#     # 打印接收到的原始数据
+#     data = request.get_json()
+#     print("收到匹配请求数据:", data)
+#     if not data:
+#         return jsonify({
+#             "success": False,
+#             "message": "请求数据不能为空！"
+#         }), 400
+#     else:   
+#         file = request.files.get('file')
+#         filename= secure_filename(file.filename)
+#         file_path = os.path.join(UPLOAD_ADDRESS,filename)
+#         file.save(file_path)
+#         if os.path.exists(file_path):
+#             print("文件存在,路径为",file_path,"文件名为：",filename)
+#         if file:
+#             return jsonify({
+#                 "success": True,
+#                 "message": "图片接受成功"
+#             }), 200
+#         else:
+#             return jsonify({
+#                 "success": False,
+#                 "message": "图片接受失败"
+#             }), 400
+
+@app.route('/match', methods=['POST'])
 def match():
-    # 打印接收到的原始数据
-    data = request.get_json()
-    print("收到匹配请求数据:", data)
-    if not data:
+    # 检查 Authorization 请求头
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
         return jsonify({
             "success": False,
-            "message": "请求数据不能为空！"
+            "message": "缺少或无效的 Token"
+        }), 401
+
+    token = auth_header.split(" ")[1]  # 提取 Token
+    # 验证 Token
+    db = cnnect_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE token = ?", (token,))
+    user = cursor.fetchone()
+    db.close()
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+
+    # 获取上传的图片
+    file = request.files.get('image')
+    if not file:
+        return jsonify({
+            "success": False,
+            "message": "未接收到文件"
         }), 400
-    else:   
-        file = request.files.get('file')
-        indices = load_index_base('index_base')#加载索引
-        topn = search_topn(indices,file) #topn为结果图片路径
-        filename= secure_filename(file.filename)
-        file_path = os.path.join(UPLOAD_ADDRESS,filename)
-        file.save(file_path)
-        if os.path.exists(file_path):
-            print("文件存在,路径为",file_path,"文件名为：",filename)
-        if file:
-            return jsonify({
-                "success": True,
-                "message": "图片接受成功"
-            }), 200
-        else:
-            return jsonify({
-                "success": False,
-                "message": "图片接受失败"
-            }), 400
+
+    # 保存图片
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_ADDRESS, filename)
+    file.save(file_path)
+
+    # 检查文件是否保存成功
+    if not os.path.exists(file_path):
+        return jsonify({
+            "success": False,
+            "message": "文件保存失败"
+        }), 500
+
+    # 加载索引并进行匹配
+    try:
+        indices = load_index_base('utils')  # 加载索引
+        topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"匹配失败: {str(e)}"
+        }), 500
+
+    # 构造返回的图片 URL
+    base_url = request.host_url + "static/images/"  # 假设图片存储在 static/images 目录下
+    results = [{"name": name, "url": base_url + name, "score": score} for name, score in topn]
+
+    # 返回匹配结果
+    return jsonify({
+        "success": True,
+        "message": "图片接受成功",
+        "results": results  # 返回匹配结果
+    }), 200
         
 
 
