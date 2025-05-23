@@ -1,6 +1,6 @@
 import os
 import faiss
-from portrait_extraction import resnet50_feature_extractor
+from .portrait_extraction import resnet50_feature_extractor
 from typing import Dict
 
 # 批量读取文件夹中图片，提取特征并为每张图片创建并保存 Faiss 索引
@@ -50,6 +50,7 @@ def load_index_base(index_folder: str) -> Dict[str, faiss.IndexFlatIP]:
             indices[name] = faiss.read_index(path)
     return indices
 
+"""
 if __name__ == "__main__":
     # 测试代码
     input_folder = "../data/base"
@@ -72,4 +73,6 @@ if __name__ == "__main__":
 
     similarities.sort(key=lambda x: x[1], reverse=True)
     print(f"相似度排序：{similarities}")
+    
+"""
 
