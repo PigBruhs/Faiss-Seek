@@ -4,12 +4,14 @@ from torchvision.models import resnet50
 from PIL import Image
 import numpy as np
 import faiss
+import io
 
 
-def resnet50_feature_extractor(image_path, max_dim=1024):
+def resnet50_feature_extractor(image_path=None, image=None,max_dim=1024):
     """ResNet-50特征提取函数
     参数：
         image_path: 输入图片路径
+        image: 输入图片对象(内存中的
         max_dim: 最大限制尺寸
     返回：
         faiss的归一化向量
@@ -26,7 +28,15 @@ def resnet50_feature_extractor(image_path, max_dim=1024):
     ])
 
     # 加载并预处理图像
-    img = Image.open(image_path)
+    if image is not None:
+        if isinstance(image, bytes):
+            img = Image.open(io.BytesIO(image))
+        else:
+            img = image
+    elif image_path is not None:
+        img = Image.open(image_path)
+    else:
+        raise ValueError("必须提供 image_path 或 image 参数")
     input_tensor = preprocess(img).unsqueeze(0)  # 添加batch维度
 
     # 初始化模型（自动下载预训练权重）

@@ -33,6 +33,7 @@ def compute_index_similarity(index1: faiss.IndexFlatIP, index2: faiss.IndexFlatI
     D21, _ = idx1.search(xb2, 1)
     return float((D12.mean() + D21.mean()) / 2)
 
+"""
 if __name__ == "__main__":
     import portrait_extraction
 
@@ -42,3 +43,5 @@ if __name__ == "__main__":
 
     print(compute_index_similarity(index_1, index_2))
     print(compute_index_similarity(index_1, index_3))
+"""
+

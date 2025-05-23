@@ -5,6 +5,12 @@ import sqlite3
 from login import login
 from register import register
 from werkzeug.utils import secure_filename
+
+
+import sys
+sys.path.append("..")
+from utils import load_index_base,search_topn
+
 app = Flask(__name__)
 CORS(app)
 users_db = {}#数据库连接函数
@@ -105,6 +111,8 @@ def match():
         }), 400
     else:   
         file = request.files.get('file')
+        indices = load_index_base('index_base')#加载索引
+        topn = search_topn(indices,file) #topn为结果图片路径
         filename= secure_filename(file.filename)
         file_path = os.path.join(UPLOAD_ADDRESS,filename)
         file.save(file_path)
