@@ -13,7 +13,17 @@
                 </div>
                 <button :disabled="!imageFile" @click="matchImage">匹配</button>
             </div>
+            <div class="image-gallery" v-if="imageList.length > 0">
+                <h3>匹配结果：</h3>
+                <div class="image-grid">
+                    <div class="image-item" v-for="(image, index) in imageList" :key="index">
+                        <img :src="image.url" :alt="image.name" />
+                        <p>{{ image.name }} (相似度: {{ (image.score * 100).toFixed(2) }}%)</p>
+                    </div>
+                </div>
+            </div>
         </div>
+
     </div>
 </template>
 
@@ -30,7 +40,7 @@ export default {
             imageUrl: null,
             imageList: [], // 用于存储后端返回的图片列表
             userId: "",
-            role:"",
+            role: "",
         };
     },
     methods: {
@@ -42,7 +52,12 @@ export default {
             this.$router.push({ path: "/Login" }); // 跳转到登录页面
         },
         setMessage(content, type) {
-            this.$emit("set-message", content, type);
+            this.message = content;
+            this.messageType = type; // 设置消息类型
+            setTimeout(() => {
+                this.message = "";
+                this.messageType = "";
+            }, 3000); // 3秒后清除消息提示
         },
         onFileChange(e) {
             const file = e.target.files[0];
@@ -63,6 +78,7 @@ export default {
             try {
                 // 获取 token
                 const token = localStorage.getItem("token");
+
                 // POST 请求发送图片，附带 token
                 const res = await axios.post("http://localhost:19198/match", formData, {
                     headers: {
@@ -71,14 +87,23 @@ export default {
                     },
                 });
 
-                // 假设后端返回的数据格式为 { images: [...] }
-                this.imageList = res.data.images || [];
-                this.$emit("set-message", "图片获取成功", "success");
+                // 检查后端返回的数据
+                if (res.data.success && res.data.results.length > 0) {
+                    this.imageList = res.data.results; // 将返回的图片列表存储到 imageList
+                    this.setMessage("图片匹配成功", "success");
+                } else if (res.data.success && res.data.results.length === 0) {
+                    this.setMessage("未找到匹配的图片", "warning");
+                } else {
+                    this.setMessage(res.data.message || "图片匹配失败", "error");
+                }
+
+                console.log("匹配结果:", this.imageList); // 打印匹配结果
             } catch (err) {
-                this.$emit("set-message", "图片获取失败", "error");
+                console.error("图片匹配失败:", err);
+                this.setMessage("图片匹配失败，请稍后重试", "error");
             }
         },
-        
+
         async checkTokenValidity() {
             const token = localStorage.getItem("token");
             if (!token) {
@@ -162,6 +187,42 @@ export default {
     max-height: 300px;
     display: block;
     margin-bottom: 10px;
+}
+
+.image-gallery {
+    margin-top: 40px;
+    width: 90%;
+}
+
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    /* 每行展示 3 张图片 */
+    gap: 20px;
+    /* 图片之间的间距 */
+}
+
+.image-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.image-item img {
+    max-width: 100%;
+    /* 图片宽度自适应 */
+    height: auto;
+    /* 保留原始长宽比 */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.image-item p {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #333;
 }
 
 .message-box.success {

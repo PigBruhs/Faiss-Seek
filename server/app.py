@@ -222,7 +222,7 @@ def match():
 
     # 加载索引并进行匹配
     try:
-        indices = load_index_base('utils')  # 加载索引
+        indices = load_index_base('../index_base')  # 加载索引
         topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
     except Exception as e:
         return jsonify({
@@ -232,7 +232,7 @@ def match():
 
     # 构造返回的图片 URL
     base_url = request.host_url + "static/images/"  # 假设图片存储在 static/images 目录下
-    results = [{"name": name, "url": base_url + name, "score": score} for name, score in topn]
+    results = [{"name": name, "url": base_url + name + ".jpg", "score": score} for name, score in topn]
 
     # 返回匹配结果
     return jsonify({
