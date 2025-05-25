@@ -191,38 +191,40 @@ export default {
 
 .image-gallery {
     margin-top: 40px;
-    width: 90%;
+    width: 95%; /* 增加容器宽度 */
 }
 
 .image-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    /* 每行展示 3 张图片 */
-    gap: 20px;
-    /* 图片之间的间距 */
+    grid-template-columns: repeat(3, 1fr); /* 每行展示 3 张图片 */
+    gap: 150px; /* 缩小图片之间的间距 */
 }
 
 .image-item {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    flex-direction: column; /* 让图片和文字垂直排列 */
+    justify-content: center; /* 水平居中图片 */
+    align-items: center; /* 垂直居中图片 */
     text-align: center;
+    width: 100%; /* 占满父容器 */
+    height: 500px; /* 固定容器高度 */
+    overflow: hidden; /* 隐藏超出容器的部分 */
 }
 
 .image-item img {
-    max-width: 100%;
-    /* 图片宽度自适应 */
-    height: auto;
-    /* 保留原始长宽比 */
+    width: auto; /* 图片宽度自适应 */
+    height: 100%; /* 图片高度占满容器 */
+    object-fit: contain; /* 保持图片长宽比，显示完整内容 */
     border: 1px solid #ccc;
     border-radius: 5px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .image-item p {
-    margin-top: 10px;
+    margin-top: 30px; /* 文字与图片之间的间距 */
     font-size: 14px;
     color: #333;
+    text-align: center;
 }
 
 .message-box.success {

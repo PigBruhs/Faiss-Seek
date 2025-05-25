@@ -4,11 +4,12 @@ import sys
 import os
 import sqlite3
 import faiss
-
+from flask import send_from_directory
 from login import login
 from register import register
 from werkzeug.utils import secure_filename
 from typing import Dict
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.index_base import load_index_base
@@ -22,6 +23,10 @@ UPLOAD_ADDRESS = 'data/upload'
 app.config['UPLOAD_ADDRESS'] = UPLOAD_ADDRESS
 if not os.path.exists(UPLOAD_ADDRESS):
     os.makedirs(UPLOAD_ADDRESS)
+
+@app.route('/data/base/<path:filename>')
+def serve_image(filename):
+    return send_from_directory('../data/base', filename)
 
 def load_index_base(index_folder: str) -> Dict[str, faiss.IndexFlatIP]:
     """
@@ -208,9 +213,16 @@ def match():
             "message": "未接收到文件"
         }), 400
 
-    # 保存图片
+    # 确保文件名包含扩展名
     filename = secure_filename(file.filename)
-    file_path = os.path.join(UPLOAD_ADDRESS, filename)
+    if '.' not in filename:
+        filename += '.jpg'  # 默认添加 .jpg 扩展名
+
+    # 保存图片到临时目录
+    temp_dir = '../data/temp'
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+    file_path = os.path.join(temp_dir, filename)
     file.save(file_path)
 
     # 检查文件是否保存成功
@@ -225,13 +237,20 @@ def match():
         indices = load_index_base('../index_base')  # 加载索引
         topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
     except Exception as e:
+        # 删除临时文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
         return jsonify({
             "success": False,
             "message": f"匹配失败: {str(e)}"
         }), 500
 
+    # 删除临时文件
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
     # 构造返回的图片 URL
-    base_url = request.host_url + "static/images/"  # 假设图片存储在 static/images 目录下
+    base_url = request.host_url + "data/base/"
     results = [{"name": name, "url": base_url + name + ".jpg", "score": score} for name, score in topn]
 
     # 返回匹配结果
