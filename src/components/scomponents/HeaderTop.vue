@@ -41,7 +41,7 @@ export default {
     background-color: rgba(255, 255, 255, 0.5);
     flex-direction: row-reverse;
     
-    backdrop-filter: blur(5px) brightness(200%) contrast(110%);
+    backdrop-filter: blur(1px);
     /* background-image: url("/src/assets/images/backgroundimg.jpg"); */
     background-size: cover;
     box-shadow: 0px 5px 15px rgba(94, 93, 93, 0.5);

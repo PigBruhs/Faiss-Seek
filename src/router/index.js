@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import axios from 'axios';
 
 // 引入路由组件
 import Home from'../components/Home.vue';
@@ -18,6 +17,10 @@ const routes = [
   {
     path: '/Register',
     component: Register,
+  },
+  {
+    path: '/Home',
+    component: Home,
   }
 ];
 
