@@ -1,56 +1,88 @@
+# Faiss-Seek/utils/index_base.py
+
 import os
 import faiss
+import hashlib
+import tempfile
+from typing import Dict, List, Tuple
 from .portrait_extraction import resnet50_feature_extractor
-from typing import Dict
 
-# 批量读取文件夹中图片，提取特征并为每张图片创建并保存 Faiss 索引
+def build_index_base(
+    input_folder: str = None,
+    index_folder: str = None,
+    crawler_results: List[Tuple[str, bytes]] = None
+) -> bool:
+    url_dir = os.path.join(index_folder, 'url')
+    local_dir = os.path.join(index_folder, 'local')
+    os.makedirs(url_dir, exist_ok=True)
+    os.makedirs(local_dir, exist_ok=True)
+    success = True
+    cache_dir = None
 
-def build_index_base(input_folder: str, index_folder: str) -> bool:
-    """
-    批量处理 input_folder 下的所有图片文件，提取 ResNet50 特征，创建 IndexFlatIP 索引并保存到 index_folder。
-    输入
-        input_folder: 图片文件夹路径
-        index_folder: 索引文件夹路径
-    返回：
-        if_success: 所有索引文件是否成功构建
-    """
-    os.makedirs(index_folder, exist_ok=True)
-    if_success = True
-    for filename in os.listdir(input_folder):
-        if not filename.lower().endswith((".jpg", ".jpeg", ".png", ".bmp")):
+    try:
+        if crawler_results:
+            cache_dir = tempfile.mkdtemp()
+            for url, img_bytes in crawler_results:
+                key = hashlib.md5(url.encode('utf-8')).hexdigest()
+                tmp_path = os.path.join(cache_dir, f"{key}.img")
+                with open(tmp_path, 'wb') as f:
+                    f.write(img_bytes)
+                try:
+                    feat = resnet50_feature_extractor(image=img_bytes)
+                    d = feat.shape[1]
+                    idx = faiss.IndexFlatIP(d)
+                    idx.add(feat)
+                    faiss.write_index(idx, os.path.join(url_dir, f"{key}.index"))
+                    with open(os.path.join(url_dir, f"{key}.url"), 'w', encoding='utf-8') as f:
+                        f.write(url)
+                except Exception:
+                    success = False
+                finally:
+                    os.remove(tmp_path)
+        else:
+            for filename in os.listdir(input_folder or ""):
+                if not filename.lower().endswith((".jpg", ".jpeg", ".png", ".bmp")):
+                    continue
+                try:
+                    image_path = os.path.join(input_folder, filename)
+                    feat = resnet50_feature_extractor(image_path=image_path)
+                    d = feat.shape[1]
+                    idx = faiss.IndexFlatIP(d)
+                    idx.add(feat)
+                    base, _ = os.path.splitext(filename)
+                    faiss.write_index(idx, os.path.join(local_dir, f"{base}.index"))
+                    with open(os.path.join(local_dir, f"{base}.url"), 'w', encoding='utf-8') as f:
+                        f.write(base)
+                except Exception:
+                    success = False
+    finally:
+        if cache_dir and os.path.isdir(cache_dir):
+            os.rmdir(cache_dir)
+
+    return success
+
+def load_index_base(index_folder: str) -> Dict[str, Dict[str, faiss.IndexFlatIP]]:
+    indices: Dict[str, Dict[str, faiss.IndexFlatIP]] = {'local': {}, 'url': {}}
+    for kind in ('local', 'url'):
+        dir_path = os.path.join(index_folder, kind)
+        if not os.path.isdir(dir_path):
             continue
-        try:
-            image_path = os.path.join(input_folder, filename)
-            feat = resnet50_feature_extractor(image_path)
-            d = feat.shape[1]
-            index = faiss.IndexFlatIP(d)
-            index.add(feat)
-            base, _ = os.path.splitext(filename)
-            index_path = os.path.join(index_folder, f"{base}.index")
-            faiss.write_index(index, index_path)
-        except Exception as e:
-            print(f"Failed to build index for {filename}: {e}")
-            if_success = False
-    return if_success
-
-# 从磁盘加载所有 .index 文件，返回图片名到 Faiss 索引的映射
-def load_index_base(index_folder: str) -> Dict[str, faiss.IndexFlatIP]:
-    """
-    扫描 index_folder 下所有 .index 文件，加载为 Faiss 索引，并以文件名(不含扩展)为 key 返回。
-    输入：
-        index_folder: 索引文件夹路径
-    返回：
-        Dict[str, faiss.IndexFlatIP], 文件名到索引的字典
-    """
-    indices: Dict[str, faiss.IndexFlatIP] = {}
-    for file in os.listdir(index_folder):
-        if file.lower().endswith(".index"):
-            name, _ = os.path.splitext(file)
-            path = os.path.join(index_folder, file)
-            indices[name] = faiss.read_index(path)
+        for fn in os.listdir(dir_path):
+            if not fn.endswith(".index"):
+                continue
+            name, _ = os.path.splitext(fn)
+            path = os.path.join(dir_path, fn)
+            idx = faiss.read_index(path)
+            url_file = os.path.join(dir_path, f"{name}.url")
+            if os.path.isfile(url_file):
+                with open(url_file, encoding='utf-8') as f:
+                    key = f.read().strip()
+            else:
+                key = name
+            indices[kind][key] = idx
     return indices
 
-"""
+
 if __name__ == "__main__":
     # 测试代码
     input_folder = "../data/base"
@@ -74,5 +106,5 @@ if __name__ == "__main__":
     similarities.sort(key=lambda x: x[1], reverse=True)
     print(f"相似度排序：{similarities}")
     
-"""
+
 

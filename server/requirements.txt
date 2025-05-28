@@ -9,3 +9,5 @@ faiss-cpu==1.7.4
 torch
 torchvision
 torchaudio
+requests
+bs4
