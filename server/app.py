@@ -214,7 +214,7 @@ def match():
         os.remove(file_path)
 
     base_url = request.host_url + "data/base/"
-    results = [{"name": name, "url": base_url + name + ".jpg", "score": score} for name, score in topn]
+    results = [{"name": name, "url": base_url + name, "score": score} for name, score in topn]
 
     return jsonify({
         "success": True,
