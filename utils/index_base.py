@@ -15,7 +15,7 @@ import numpy as np
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.portrait_extraction import resnet50_feature_extractor, vit_b_16_feature_extractor
 
-def build_index_base(input_folder: str, index_folder: str) -> bool:
+def build_index_base(input_folder: str, index_folder: str,model = "vit16") -> bool:
     # 清理并创建索引输出目录
     local_dir = os.path.join(index_folder, 'local')
     if os.path.isdir(local_dir):
@@ -31,7 +31,11 @@ def build_index_base(input_folder: str, index_folder: str) -> bool:
         path = os.path.join(input_folder, fname)
         try:
             # 提取特征并转为 (1, d) 的 float32 数组
-            feat = vit_b_16_feature_extractor(image_path=path)
+            if model == "resnet50":
+                feat = resnet50_feature_extractor(image_path=path)
+            elif model == "vit16":
+                feat = vit_b_16_feature_extractor(image_path=path)
+
             faiss.write_index(feat, os.path.join(local_dir, f"{fname}.index"))
         except Exception as e:
             print(f"Failed to process {fname}: {e}")
@@ -39,25 +43,17 @@ def build_index_base(input_folder: str, index_folder: str) -> bool:
 
     return success
 
-def load_index_base(index_folder: str) -> Dict[str, Dict[str, faiss.IndexFlatIP]]:
-    indices: Dict[str, Dict[str, faiss.IndexFlatIP]] = {'local': {}, 'url': {}}
-    for kind in ('local', 'url'):
-        dir_path = os.path.join(index_folder, kind)
-        if not os.path.isdir(dir_path):
-            continue
-        for fn in os.listdir(dir_path):
-            if not fn.endswith(".index"):
-                continue
+def load_index_base(index_folder: str) -> dict[str, faiss.IndexFlatIP]:
+    indices = {}
+    if not os.path.isdir(index_folder):
+        print(f"Index folder {index_folder} does not exist.")
+        return indices
+    for fn in os.listdir(index_folder):
+        if fn.endswith('.index'):
             name, _ = os.path.splitext(fn)
-            path = os.path.join(dir_path, fn)
-            idx = faiss.read_index(path)
-            url_file = os.path.join(dir_path, f"{name}.url")
-            if os.path.isfile(url_file):
-                with open(url_file, encoding='utf-8') as f:
-                    key = f.read().strip()
-            else:
-                key = name
-            indices[kind][key] = idx
+            idx_path = os.path.join(index_folder, fn)
+            idx = faiss.read_index(idx_path)
+            indices[name] = idx
     return indices
 
 if __name__ == "__main__":

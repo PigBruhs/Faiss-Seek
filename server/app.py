@@ -152,7 +152,75 @@ def login_():
                 "success": False,
                 "message": "登录失败！请检查用户名和密码！"
             }), 401
+@app.route('/match', methods=['POST'])
+def match():
+    # 检查 Authorization 请求头
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({
+            "success": False,
+            "message": "缺少或无效的 Token"
+        }), 401
 
+    token = auth_header.split(" ")[1]  # 提取 Token
+    db = cnnect_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE token = ?", (token,))
+    user = cursor.fetchone()
+    db.close()
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+
+    # 获取上传的图片
+    file = request.files.get('image')
+    if not file:
+        return jsonify({
+            "success": False,
+            "message": "未接收到文件"
+        }), 400
+
+    filename = secure_filename(file.filename)
+    if '.' not in filename:
+        filename += '.jpg'
+
+    temp_dir = '../data/temp'
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+    file_path = os.path.join(temp_dir, filename)
+    file.save(file_path)
+
+    if not os.path.exists(file_path):
+        return jsonify({
+            "success": False,
+            "message": "文件保存失败"
+        }), 500
+
+    try:
+        indices = load_index_base('../index_base/local')  # 加载索引
+        topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({
+            "success": False,
+            "message": f"匹配失败: {str(e)}"
+        }), 500
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    base_url = request.host_url + "data/base/"
+    results = [{"name": name, "url": base_url + name + ".jpg", "score": score} for name, score in topn]
+
+    return jsonify({
+        "success": True,
+        "message": "图片接受成功",
+        "results": results
+    }), 200
 '''
 @app.route('/match', methods=['POST'])
 def match():
