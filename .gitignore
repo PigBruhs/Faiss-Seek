@@ -51,3 +51,4 @@ __pycache__/
 # 忽略 vue包json
 *.ts
 src/components.d.ts
+pretrained/imagenet21k+imagenet2012_ViT-B_16-224.pth

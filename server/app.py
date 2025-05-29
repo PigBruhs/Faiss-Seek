@@ -153,34 +153,7 @@ def login_():
                 "message": "登录失败！请检查用户名和密码！"
             }), 401
 
-# @app.route('/match', methods=['POST']) 
-# def match():
-#     # 打印接收到的原始数据
-#     data = request.get_json()
-#     print("收到匹配请求数据:", data)
-#     if not data:
-#         return jsonify({
-#             "success": False,
-#             "message": "请求数据不能为空！"
-#         }), 400
-#     else:   
-#         file = request.files.get('file')
-#         filename= secure_filename(file.filename)
-#         file_path = os.path.join(UPLOAD_ADDRESS,filename)
-#         file.save(file_path)
-#         if os.path.exists(file_path):
-#             print("文件存在,路径为",file_path,"文件名为：",filename)
-#         if file:
-#             return jsonify({
-#                 "success": True,
-#                 "message": "图片接受成功"
-#             }), 200
-#         else:
-#             return jsonify({
-#                 "success": False,
-#                 "message": "图片接受失败"
-#             }), 400
-
+'''
 @app.route('/match', methods=['POST'])
 def match():
     # 检查 Authorization 请求头
@@ -234,7 +207,7 @@ def match():
 
     # 加载索引并进行匹配
     try:
-        indices = load_index_base('../index_base/url')  # 加载索引
+        indices = load_index_base('../index_base/local')  # 加载索引
         topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
     except Exception as e:
         # 删除临时文件
@@ -259,7 +232,7 @@ def match():
         "message": "图片接受成功",
         "results": results  # 返回匹配结果
     }), 200
-        
+        '''
 
 
 @app.before_request#请求前处理函数，通过g这个变量存储数据库连接
