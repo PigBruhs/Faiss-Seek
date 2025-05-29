@@ -34,7 +34,7 @@ def search_topn(
         query_idx = resnet50_feature_extractor(image_path=image_path, image=image)
 
     query_vec = query_idx.reconstruct_n(0, 1).astype(np.float32)
-    faiss.normalize_L2(query_vec)
+    #faiss.normalize_L2(query_vec)
 
     # 2. 合并底库所有向量并记录名称顺序
     names, feats = [], []
@@ -43,7 +43,7 @@ def search_topn(
         if nt == 0:
             continue
         vecs = idx.reconstruct_n(0, nt).astype(np.float32)
-        faiss.normalize_L2(vecs)
+        #faiss.normalize_L2(vecs)
         for v in vecs:
             names.append(name)
             feats.append(v)
@@ -63,17 +63,16 @@ def search_topn(
         results.append((names[idx], float(score)))
     return results
 
-"""
+
 if __name__ == "__main__":
     # 测试代码
  
     image_path = "../data/search/002_anchor_image_0001.jpg"
     from utils.index_base import load_index_base
     indices = load_index_base("../index_base/local")
-    print(indices)
-    results = search_topn(indices,image_path=image_path, top_n=5)
+    results = search_topn(indices,image_path=image_path, top_n=5, model="vit16")
     print(results)
-"""
+
 
 
 

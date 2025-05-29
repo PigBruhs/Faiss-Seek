@@ -59,5 +59,5 @@ def load_index_base(index_folder: str) -> dict[str, faiss.IndexFlatIP]:
 if __name__ == "__main__":
     input_folder = "../data/base"
     index_folder = "../index_base"
-    success = build_index_base(input_folder, index_folder)
+    success = build_index_base(input_folder, index_folder,model="vit16")
     print("All indices built successfully." if success else "Some indices failed to build.")
