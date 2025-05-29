@@ -1,7 +1,10 @@
-from .portrait_extraction import resnet50_feature_extractor
+import os
+
 import faiss
 import numpy as np
-import os
+
+from .portrait_extraction import resnet50_feature_extractor
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑着两个pytorch导致它报的不安全。实际情况应该不会用到
 
 def search_topn(

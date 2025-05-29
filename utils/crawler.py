@@ -1,9 +1,10 @@
 # Faiss-Seek/utils/crawler.py
 
+import os
+import time
+
 import requests
 from bs4 import BeautifulSoup
-import time
-import os
 
 BASE_IMAGE_URL = "http://hbimg.huaban.com/"
 START_URL = "https://miankoutupian.com/image/search/"

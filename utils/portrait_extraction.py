@@ -1,10 +1,11 @@
+import io
+
+import faiss
+import numpy as np
 import torch
 import torchvision.transforms as transforms
-from torchvision.models import resnet50,vit_b_16
 from PIL import Image
-import numpy as np
-import faiss
-import io
+from torchvision.models import resnet50, vit_b_16
 
 
 def resnet50_feature_extractor(image_path=None, image=None,max_dim=1024):

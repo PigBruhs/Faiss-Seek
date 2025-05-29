@@ -1,63 +1,41 @@
-# Faiss-Seek/utils/index_base.py
+# FS/utils/index_base.py
 
-import os
-import faiss
 import hashlib
+from tqdm import tqdm
+import os
 import tempfile
 from typing import Dict, List, Tuple
-from .portrait_extraction import resnet50_feature_extractor
 
-def build_index_base(
-    input_folder: str = None,
-    index_folder: str = None,
-    crawler_results: List[Tuple[str, bytes]] = None
-) -> bool:
-    url_dir = os.path.join(index_folder, 'url')
+import faiss
+import sys
+import shutil
+
+import numpy as np
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.portrait_extraction import resnet50_feature_extractor, vit_b_16_feature_extractor
+
+def build_index_base(input_folder: str, index_folder: str) -> bool:
+    # 清理并创建索引输出目录
     local_dir = os.path.join(index_folder, 'local')
-    os.makedirs(url_dir, exist_ok=True)
+    if os.path.isdir(local_dir):
+        shutil.rmtree(local_dir)
     os.makedirs(local_dir, exist_ok=True)
-    success = True
-    cache_dir = None
 
-    try:
-        if crawler_results:
-            cache_dir = tempfile.mkdtemp()
-            for url, img_bytes in crawler_results:
-                key = hashlib.md5(url.encode('utf-8')).hexdigest()
-                tmp_path = os.path.join(cache_dir, f"{key}.img")
-                with open(tmp_path, 'wb') as f:
-                    f.write(img_bytes)
-                try:
-                    feat = resnet50_feature_extractor(image=img_bytes)
-                    d = feat.shape[1]
-                    idx = faiss.IndexFlatIP(d)
-                    idx.add(feat)
-                    faiss.write_index(idx, os.path.join(url_dir, f"{key}.index"))
-                    with open(os.path.join(url_dir, f"{key}.url"), 'w', encoding='utf-8') as f:
-                        f.write(url)
-                except Exception:
-                    success = False
-                finally:
-                    os.remove(tmp_path)
-        else:
-            for filename in os.listdir(input_folder or ""):
-                if not filename.lower().endswith((".jpg", ".jpeg", ".png", ".bmp")):
-                    continue
-                try:
-                    image_path = os.path.join(input_folder, filename)
-                    feat = resnet50_feature_extractor(image_path=image_path)
-                    d = feat.shape[1]
-                    idx = faiss.IndexFlatIP(d)
-                    idx.add(feat)
-                    base, _ = os.path.splitext(filename)
-                    faiss.write_index(idx, os.path.join(local_dir, f"{base}.index"))
-                    with open(os.path.join(local_dir, f"{base}.url"), 'w', encoding='utf-8') as f:
-                        f.write(base)
-                except Exception:
-                    success = False
-    finally:
-        if cache_dir and os.path.isdir(cache_dir):
-            os.rmdir(cache_dir)
+    success = True
+    exts = ('.jpg', '.jpeg', '.png', '.bmp')
+
+    for fname in tqdm(os.listdir(input_folder), desc='Building indices'):
+        if not fname.lower().endswith(exts):
+            continue
+        path = os.path.join(input_folder, fname)
+        try:
+            # 提取特征并转为 (1, d) 的 float32 数组
+            feat = vit_b_16_feature_extractor(image_path=path)
+            faiss.write_index(feat, os.path.join(local_dir, f"{fname}.index"))
+        except Exception as e:
+            print(f"Failed to process {fname}: {e}")
+            success = False
 
     return success
 
@@ -82,29 +60,8 @@ def load_index_base(index_folder: str) -> Dict[str, Dict[str, faiss.IndexFlatIP]
             indices[kind][key] = idx
     return indices
 
-
 if __name__ == "__main__":
-    # 测试代码
     input_folder = "../data/base"
     index_folder = "../index_base"
     success = build_index_base(input_folder, index_folder)
-    if success:
-        print("All indices built successfully.")
-    else:
-        print("Some indices failed to build.")
-    indices = load_index_base(index_folder)
-    for name, index in indices.items():
-        print(f"Loaded index for {name}: {index.ntotal} vectors")
-
-    from index_similarity import compute_index_similarity
-    features = resnet50_feature_extractor("../data/search/002_anchor_image_0001.jpg")
-    similarities = []
-    for name, index in indices.items():
-        compute_index_similarity(features, index)
-        similarities.append((name, compute_index_similarity(features, index)))
-
-    similarities.sort(key=lambda x: x[1], reverse=True)
-    print(f"相似度排序：{similarities}")
-    
-
-
+    print("All indices built successfully." if success else "Some indices failed to build.")

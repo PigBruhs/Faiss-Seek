@@ -1,5 +1,7 @@
-import faiss
 import os
+
+import faiss
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑着两个pytorch导致它报的不安全。实际情况应该不会用到
 # 计算两个特征数组的相似度
 def compute_index_similarity(index1: faiss.IndexFlatIP, index2: faiss.IndexFlatIP) -> float:
