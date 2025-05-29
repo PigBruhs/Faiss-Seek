@@ -16,10 +16,7 @@
             <div class="image-gallery" v-if="imageList.length > 0">
                 <h3>匹配结果：</h3>
                 <div class="image-grid">
-                    <div class="image-item" v-for="(image, index) in imageList" :key="index">
-                        <img :src="image.url" :alt="image.name" />
-                        <p>{{ image.name }} (相似度: {{ (image.score * 100).toFixed(2) }}%)</p>
-                    </div>
+                    <ImageDiv v-for="(image, index) in imageList" :key="index" :imageSrc="image.url" :imageTitle="image.name" />
                 </div>
             </div>
         </div>
@@ -30,9 +27,10 @@
 <script>
 import HeaderTopAfterLogin from "./scomponents/HeaderTopAfterLogin.vue";
 import axios from "axios";
+import ImageDiv from "./scomponents/ImageDiv.vue";
 
 export default {
-    components: { HeaderTopAfterLogin },
+    components: { HeaderTopAfterLogin, ImageDiv },
     data() {
         return {
             message: "",

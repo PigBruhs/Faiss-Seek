@@ -234,7 +234,7 @@ def match():
 
     # 加载索引并进行匹配
     try:
-        indices = load_index_base('../index_base')  # 加载索引
+        indices = load_index_base('../index_base/url')  # 加载索引
         topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
     except Exception as e:
         # 删除临时文件
