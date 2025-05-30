@@ -7,7 +7,11 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 from utils.portrait_extraction import resnet50_feature_extractor,vit_b_16_feature_extractor
+=======
+from utils.portrait_extraction import resnet50_feature_extractor,vit_b_16_feature_extractor,vgg16_feature_extractor
+>>>>>>> main
 =======
 from utils.portrait_extraction import resnet50_feature_extractor,vit_b_16_feature_extractor,vgg16_feature_extractor
 >>>>>>> main
@@ -24,7 +28,11 @@ def search_topn(
     top_n: int = 5,
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     model = "vit16"
+=======
+    model = "vgg16"
+>>>>>>> main
 =======
     model = "vgg16"
 >>>>>>> main
@@ -50,6 +58,11 @@ def search_topn(
         query_idx = resnet50_feature_extractor(image_path=image_path, image=image)
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+    elif model == "vgg16":
+        query_idx = vgg16_feature_extractor(image_path=image_path, image=image)
+>>>>>>> main
 =======
     elif model == "vgg16":
         query_idx = vgg16_feature_extractor(image_path=image_path, image=image)
@@ -98,8 +111,12 @@ if __name__ == "__main__":
     indices = load_index_base("../index_base/local")
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     print(indices)
     results = search_topn(indices,image_path=image_path, top_n=5)
+=======
+    results = search_topn(indices,image_path=image_path, top_n=5, model="vit16")
+>>>>>>> main
 =======
     results = search_topn(indices,image_path=image_path, top_n=5, model="vit16")
 >>>>>>> main
@@ -111,8 +128,11 @@ if __name__ == "__main__":
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> main
 =======
 >>>>>>> main
 
