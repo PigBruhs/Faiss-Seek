@@ -201,6 +201,12 @@ def match():
 
     try:
         indices = load_index_base('../index_base/local')  # 加载索引
+        print("索引加载成功:", indices.keys())  # 打印加载的索引文件名
+    except Exception as e:
+        print("索引加载失败:", str(e))
+        raise
+
+    try:
         topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
     except Exception as e:
         if os.path.exists(file_path):
