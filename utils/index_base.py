@@ -1,10 +1,7 @@
-# FS/utils/index_base.py
 
-import hashlib
 from tqdm import tqdm
 import os
-import tempfile
-from typing import Dict, List, Tuple
+
 
 import faiss
 import sys
@@ -13,9 +10,13 @@ import shutil
 import numpy as np
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.portrait_extraction import resnet50_feature_extractor, vit_b_16_feature_extractor
+from utils.portrait_extraction import resnet50_feature_extractor, vit_b_16_feature_extractor,vgg16_feature_extractor
 
+<<<<<<< HEAD
 def build_index_base(input_folder: str, index_folder: str,model = "vit16") -> bool:
+=======
+def build_index_base(input_folder: str, index_folder: str,model = "vgg16") -> bool:
+>>>>>>> main
     # 清理并创建索引输出目录
     local_dir = os.path.join(index_folder, 'local')
     if os.path.isdir(local_dir):
@@ -35,6 +36,11 @@ def build_index_base(input_folder: str, index_folder: str,model = "vit16") -> bo
                 feat = resnet50_feature_extractor(image_path=path)
             elif model == "vit16":
                 feat = vit_b_16_feature_extractor(image_path=path)
+<<<<<<< HEAD
+=======
+            elif model == "vgg16":
+                feat = vgg16_feature_extractor(image_path=path)
+>>>>>>> main
 
             faiss.write_index(feat, os.path.join(local_dir, f"{fname}.index"))
         except Exception as e:
@@ -59,5 +65,5 @@ def load_index_base(index_folder: str) -> dict[str, faiss.IndexFlatIP]:
 if __name__ == "__main__":
     input_folder = "../data/base"
     index_folder = "../index_base"
-    success = build_index_base(input_folder, index_folder)
+    success = build_index_base(input_folder, index_folder,model="vgg16")
     print("All indices built successfully." if success else "Some indices failed to build.")
