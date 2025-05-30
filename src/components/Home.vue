@@ -5,6 +5,7 @@
             {{ message }}
         </div>
         <div class="home-container">
+            <SelectWeb :onSelectWeb="handleWebSelection" />
             <div class="upload-section">
                 <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
                 <div v-if="imageUrl" class="preview">
@@ -36,9 +37,10 @@
 import ImageDiv from "./scomponents/ImageDiv.vue";
 import HeaderTopAfterLogin from "./scomponents/HeaderTopAfterLogin.vue";
 import axios from "axios";
+import SelectWeb from "./scomponents/SelectWeb.vue";
 
 export default {
-    components: { ImageDiv, HeaderTopAfterLogin },
+    components: { ImageDiv, HeaderTopAfterLogin, SelectWeb },
     data() {
         return {
             imageFile: null, // 存储上传的图片文件
@@ -48,7 +50,8 @@ export default {
             matchingImageUrl: "", // 匹配中显示的图片 URL
             message: "",
             messageType: "",
-            userId:"", // 用户 ID
+            userId: "", // 用户 ID
+            SelectWeb: "", // 选择的网页
         };
     },
     methods: {
@@ -58,6 +61,10 @@ export default {
             localStorage.removeItem("role"); // 清除用户组
             this.updateUserId(); // 更新用户信息
             this.$router.push({ path: "/Login" }); // 跳转到登录页面
+        },
+        handleWebSelection(webName) {
+            this.selectedWeb = webName; // 接收子组件传递的网页名字
+            console.log("用户选择的网页:", webName);
         },
         setMessage(content, type) {
             this.message = content;
