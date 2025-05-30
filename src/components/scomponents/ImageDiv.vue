@@ -1,9 +1,11 @@
 <template>
   <a-image
     :src="imageSrc1"
-    :title="imageTitle"
+    :title="truncatedTitle"
     :description="imageDescription"
     width="260"
+    height="269"
+    fit="cover"
     style="margin-right: 67px; vertical-align: top;"
     :preview-visible="visible1"
     @preview-visible-change="() => { visible1 = false }"
@@ -18,59 +20,55 @@
       </div>
     </template>
   </a-image>
-  <a-image
-    :src="imageSrc2"
-    :title="imageTitle"
-    :description="imageDescription"
-    width="260"
-    footer-position="outer"
-    :preview-visible="visible2"
-    @preview-visible-change="() => { visible2 = false }"
-  >
-    <template #extra>
-      <div class="actions actions-outer">
-        <span class="action" @click="() => { visible2 = true }"><icon-eye /></span>
-        <span class="action" @click="onDownLoad"><icon-download /></span>
-        <a-tooltip :content="tooltipContent">
-          <span class="action"><icon-info-circle /></span>
-        </a-tooltip>
-      </div>
-    </template>
-  </a-image>
 </template>
 <script>
-  import { ref } from 'vue';
-  import { IconEye, IconDownload, IconInfoCircle } from '@arco-design/web-vue/es/icon';
+import { ref, computed, onMounted } from 'vue';
+import { IconEye, IconDownload, IconInfoCircle } from '@arco-design/web-vue/es/icon';
 
-  export default {
-    components: {
-      IconEye, IconDownload, IconInfoCircle
+export default {
+  components: {
+    IconEye, IconDownload, IconInfoCircle
+  },
+  props: {
+    imageSrc1: {
+      type: String,
+      required: true
     },
-    setup() {
-      const visible1 = ref(false);
-      const visible2 = ref(false);
-
-      // 定义变量
-      const imageSrc1 = ref('');
-      const imageSrc2 = ref('https://p1-arco.byteimg.com/tos-cn-i-uwbnlip3yd/a8c8cdb109cb051163646151a4a5083b.png~tplv-uwbnlip3yd-webp.webp');
-      const imageTitle = ref('A user’s avatar');
-      const imageDescription = ref('Present by Arco Design');
-      const tooltipContent = ref('A user’s avatar');
-
-      return {
-        visible1,
-        visible2,
-        imageSrc1,
-        imageSrc2,
-        imageTitle,
-        imageDescription,
-        tooltipContent,
-        onDownLoad() {
-          console.log('download');
-        },
-      }
+    imageTitle: {
+      type: String,
+      required: true
+    },
+    imageDescription: {
+      type: String,
+      required: true
+    },
+    tooltipContent: {
+      type: String,
+      required: true
     }
+  },
+  setup(props) {
+    const visible1 = ref(false);
+
+    // 处理图片标题，超过 8 个字时省略至 5 个字加 "..."
+    const truncatedTitle = computed(() => {
+      return props.imageTitle.length > 15
+        ? props.imageTitle.slice(0, 12) + '...'
+        : props.imageTitle;
+    });
+
+    const onDownLoad = () => {
+      console.log('download');
+    };
+
+    return {
+      visible1,
+      truncatedTitle,
+      ...props,
+      onDownLoad
+    };
   }
+};
 </script>
 <style scoped>
   .actions {
@@ -99,4 +97,7 @@
       }
     }
   }
+  ::v-deep .arco-image-img {
+  object-fit: cover !important;
+}
 </style>
