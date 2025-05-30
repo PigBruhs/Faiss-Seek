@@ -137,14 +137,14 @@ def login_():
 
     else:    # 直接返回前端需要的响应格式
       print(data)#打印接受到的数据，确认数据是什么类型的
-      result = login(data['userId'], data['password'])
+      result = login(data['userId'], data['password'])  # 调用登录函数
       if result[0]:
           print(data)
           return jsonify({
               "success": True,
               "message": "登录成功！",
               "token": result[1],
-              "role": "user",
+              "role": result[2],
               "userId": data['userId']
           }), 200
       else:

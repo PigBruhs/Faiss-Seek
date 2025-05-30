@@ -5,7 +5,8 @@
             {{ message }}
         </div>
         <div class="home-container">
-            <SelectWeb :onSelectWeb="handleWebSelection" />
+            <SelectWeb :onSelectWeb="handleWebSelection" :setMessage="setMessage"/>
+            <AddWeb :addWebRequest="handleAddWebRequest" :setMessage="setMessage"/>
             <div class="upload-section">
                 <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
                 <div v-if="imageUrl" class="preview">
@@ -34,13 +35,14 @@
 </template>
 
 <script>
+import AddWeb from "./scomponents/AddWeb.vue";
 import ImageDiv from "./scomponents/ImageDiv.vue";
 import HeaderTopAfterLogin from "./scomponents/HeaderTopAfterLogin.vue";
 import axios from "axios";
 import SelectWeb from "./scomponents/SelectWeb.vue";
 
 export default {
-    components: { ImageDiv, HeaderTopAfterLogin, SelectWeb },
+    components: { ImageDiv, HeaderTopAfterLogin, SelectWeb ,AddWeb},
     data() {
         return {
             imageFile: null, // 存储上传的图片文件
@@ -63,7 +65,8 @@ export default {
             this.$router.push({ path: "/Login" }); // 跳转到登录页面
         },
         handleWebSelection(webName) {
-            this.selectedWeb = webName; // 接收子组件传递的网页名字
+            this.SelectWeb = webName; // 接收子组件传递的网页名字
+            this.setMessage(`已选择网页: ${webName}`, "success");
             console.log("用户选择的网页:", webName);
         },
         setMessage(content, type) {
@@ -88,36 +91,22 @@ export default {
             this.isMatching = false; // 删除图片时重置匹配状态
             this.$refs.fileInput.value = "";
         },
-        async matchImage() {
-            if (!this.imageFile) return;
-            const formData = new FormData();
-            formData.append("image", this.imageFile);
+        async handleAddWebRequest(webData) {
+            // 处理添加网页请求
             try {
-                // 获取 token
-                const token = localStorage.getItem("token");
-
-                // POST 请求发送图片，附带 token
-                const res = await axios.post("http://localhost:19198/match", formData, {
+                const response = await axios.post("http://localhost:19198/addWeb", webData, {
                     headers: {
-                        "Content-Type": "multipart/form-data",
-                        "Authorization": `Bearer ${token}`, // 添加 token 到请求头
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
-
-                // 检查后端返回的数据
-                if (res.data.success && res.data.results.length > 0) {
-                    this.imageList = res.data.results; // 将返回的图片列表存储到 imageList
-                    this.setMessage("图片匹配成功", "success");
-                } else if (res.data.success && res.data.results.length === 0) {
-                    this.setMessage("未找到匹配的图片", "warning");
+                if (response.data.success) {
+                    this.setMessage("网页添加请求已提交", "success");
                 } else {
-                    this.setMessage(res.data.message || "图片匹配失败", "error");
+                    this.setMessage(response.data.message || "添加网页请求失败", "error");
                 }
-
-                console.log("匹配结果:", this.imageList); // 打印匹配结果
-            } catch (err) {
-                console.error("图片匹配失败:", err);
-                this.setMessage("图片匹配失败，请稍后重试", "error");
+            } catch (error) {
+                console.error("添加网页请求失败:", error);
+                this.setMessage("网络错误，请稍后重试", "error");
             }
         },
         async startMatching() {
@@ -133,6 +122,7 @@ export default {
             try {
                 const res = await axios.post("http://localhost:19198/match", formData, {
                     headers: {
+                        SelectWeb: this.SelectWeb, // 传递选择的网页
                         "Content-Type": "multipart/form-data",
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
@@ -140,6 +130,7 @@ export default {
 
                 if (res.data.success) {
                     this.imageList = res.data.results;
+                    this.setMessage("匹配成功", "success");
                     this.matchingImageUrl = "/src/assets/images/searchfinished.gif"; // 设置匹配完成的图片
                 } else {
                     this.setMessage(res.data.message || "匹配失败", "error");
@@ -296,5 +287,37 @@ input[type="file"] {
 .bottom-space {
     height: 200px;
     /* 设置底部空白区域的高度 */
+}
+.message-box {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    text-align: center;
+    width: 80%;
+    max-width: 600px;
+    color: white;
+}
+
+.message-box.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message-box.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.message-box.warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
 }
 </style>

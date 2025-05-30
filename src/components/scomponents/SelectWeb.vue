@@ -22,6 +22,10 @@ export default {
             type: Function,
             required: true, // 父组件传递回调函数
         },
+        setMessage: {
+            type: Function,
+            required: true, // 父组件传递回调函数
+        },
     },
     setup(props) {
         const visible = ref(false);
@@ -33,8 +37,12 @@ export default {
         };
         const handleOk = () => {
             visible.value = false;
-            if (selectedWeb.value)
+            if (selectedWeb.value){
                 props.onSelectWeb(selectedWeb.value); // 调用父组件传递的回调函数
+            }
+            else{
+                props.setMessage("未改变选择","warning"); // 设置消息
+            }
         };
         const handleCancel = () => {
             visible.value = false;

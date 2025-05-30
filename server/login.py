@@ -20,6 +20,7 @@ def login(userId, password):
         SELECT * FROM users WHERE userId = ? AND password = ?
         """,(userId,password)
     )
+    user = cursor.fetchone()  # 获取查询结果
     print("登录数据:",data)
     if data is not None:
         #登录成功，生成token
@@ -34,7 +35,9 @@ def login(userId, password):
         db.commit()
         db.close()
         #返回登录成功的结果 
-        return True ,token
+        role=user[3]  # 获取用户角色
+        print("用户角色:", role)
+        return True ,token , role
     else:
         print("登录失败")
-        return False,None
+        return False,None,None
