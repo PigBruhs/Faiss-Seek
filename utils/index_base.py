@@ -13,7 +13,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.portrait_extraction import resnet50_feature_extractor, vit_b_16_feature_extractor,vgg16_feature_extractor
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 def build_index_base(input_folder: str, index_folder: str,model = "vit16") -> bool:
+=======
+def build_index_base(input_folder: str, index_folder: str,model = "vgg16") -> bool:
+>>>>>>> main
 =======
 def build_index_base(input_folder: str, index_folder: str,model = "vgg16") -> bool:
 >>>>>>> main
@@ -37,6 +41,11 @@ def build_index_base(input_folder: str, index_folder: str,model = "vgg16") -> bo
             elif model == "vit16":
                 feat = vit_b_16_feature_extractor(image_path=path)
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+            elif model == "vgg16":
+                feat = vgg16_feature_extractor(image_path=path)
+>>>>>>> main
 =======
             elif model == "vgg16":
                 feat = vgg16_feature_extractor(image_path=path)
