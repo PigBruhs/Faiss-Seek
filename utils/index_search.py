@@ -5,7 +5,7 @@ import numpy as np
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.portrait_extraction import resnet50_feature_extractor,vit_b_16_feature_extractor
+from utils.portrait_extraction import resnet50_feature_extractor,vit_b_16_feature_extractor,vgg16_feature_extractor
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑着两个pytorch导致它报的不安全。实际情况应该不会用到
 
@@ -14,7 +14,7 @@ def search_topn(
     image_path: str = None,
     image=None,
     top_n: int = 5,
-    model = "vit16"
+    model = "vgg16"
 ) -> list[tuple[str, float]]:
     """
     在 index_base（名称->单向量索引）中，检索与给定图片最相似的前 top_n 个结果。
@@ -32,9 +32,11 @@ def search_topn(
         query_idx = vit_b_16_feature_extractor(image_path=image_path, image=image)
     elif model == "resnet50":
         query_idx = resnet50_feature_extractor(image_path=image_path, image=image)
+    elif model == "vgg16":
+        query_idx = vgg16_feature_extractor(image_path=image_path, image=image)
 
     query_vec = query_idx.reconstruct_n(0, 1).astype(np.float32)
-    #faiss.normalize_L2(query_vec)
+    faiss.normalize_L2(query_vec)
 
     # 2. 合并底库所有向量并记录名称顺序
     names, feats = [], []
@@ -43,7 +45,7 @@ def search_topn(
         if nt == 0:
             continue
         vecs = idx.reconstruct_n(0, nt).astype(np.float32)
-        #faiss.normalize_L2(vecs)
+        faiss.normalize_L2(vecs)
         for v in vecs:
             names.append(name)
             feats.append(v)
