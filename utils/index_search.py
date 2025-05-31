@@ -1,14 +1,20 @@
-from .portrait_extraction import resnet50_feature_extractor
+import os
+
 import faiss
 import numpy as np
-import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.portrait_extraction import resnet50_feature_extractor,vit_b_16_feature_extractor,vgg16_feature_extractor
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑着两个pytorch导致它报的不安全。实际情况应该不会用到
 
 def search_topn(
     index_base: dict[str, faiss.IndexFlatIP],
     image_path: str = None,
     image=None,
-    top_n: int = 5
+    top_n: int = 5,
+    model = "vgg16"
 ) -> list[tuple[str, float]]:
     """
     在 index_base（名称->单向量索引）中，检索与给定图片最相似的前 top_n 个结果。
@@ -21,8 +27,14 @@ def search_topn(
     返回：
       List[(名称, 相似度)]
     """
-    # 1. 提取查询特征向量
-    query_idx = resnet50_feature_extractor(image_path=image_path, image=image)
+    query_idx = None
+    if model == "vit16":
+        query_idx = vit_b_16_feature_extractor(image_path=image_path, image=image)
+    elif model == "resnet50":
+        query_idx = resnet50_feature_extractor(image_path=image_path, image=image)
+    elif model == "vgg16":
+        query_idx = vgg16_feature_extractor(image_path=image_path, image=image)
+
     query_vec = query_idx.reconstruct_n(0, 1).astype(np.float32)
     faiss.normalize_L2(query_vec)
 
@@ -53,13 +65,17 @@ def search_topn(
         results.append((names[idx], float(score)))
     return results
 
-"""
+
 if __name__ == "__main__":
     # 测试代码
  
     image_path = "../data/search/002_anchor_image_0001.jpg"
-    results = search_topn(indices,image_path=image_path, top_n=5)
+    from utils.index_base import load_index_base
+    indices = load_index_base("../index_base/local")
+    results = search_topn(indices,image_path=image_path, top_n=5, model="vit16")
     print(results)
-"""
+
+
+
 
 

@@ -137,14 +137,14 @@ def login_():
 
     else:    # 直接返回前端需要的响应格式
       print(data)#打印接受到的数据，确认数据是什么类型的
-      result = login(data['userId'], data['password'])
+      result = login(data['userId'], data['password'])  # 调用登录函数
       if result[0]:
           print(data)
           return jsonify({
               "success": True,
               "message": "登录成功！",
               "token": result[1],
-              "role": "user",
+              "role": result[2],
               "userId": data['userId']
           }), 200
       else:
@@ -152,35 +152,82 @@ def login_():
                 "success": False,
                 "message": "登录失败！请检查用户名和密码！"
             }), 401
+@app.route('/match', methods=['POST'])
+def match():
+    # 检查 Authorization 请求头
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({
+            "success": False,
+            "message": "缺少或无效的 Token"
+        }), 401
 
-# @app.route('/match', methods=['POST']) 
-# def match():
-#     # 打印接收到的原始数据
-#     data = request.get_json()
-#     print("收到匹配请求数据:", data)
-#     if not data:
-#         return jsonify({
-#             "success": False,
-#             "message": "请求数据不能为空！"
-#         }), 400
-#     else:   
-#         file = request.files.get('file')
-#         filename= secure_filename(file.filename)
-#         file_path = os.path.join(UPLOAD_ADDRESS,filename)
-#         file.save(file_path)
-#         if os.path.exists(file_path):
-#             print("文件存在,路径为",file_path,"文件名为：",filename)
-#         if file:
-#             return jsonify({
-#                 "success": True,
-#                 "message": "图片接受成功"
-#             }), 200
-#         else:
-#             return jsonify({
-#                 "success": False,
-#                 "message": "图片接受失败"
-#             }), 400
+    token = auth_header.split(" ")[1]  # 提取 Token
+    db = cnnect_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE token = ?", (token,))
+    user = cursor.fetchone()
+    db.close()
 
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+
+    # 获取上传的图片
+    file = request.files.get('image')
+    if not file:
+        return jsonify({
+            "success": False,
+            "message": "未接收到文件"
+        }), 400
+
+    filename = secure_filename(file.filename)
+    if '.' not in filename:
+        filename += '.jpg'
+
+    temp_dir = '../data/temp'
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+    file_path = os.path.join(temp_dir, filename)
+    file.save(file_path)
+
+    if not os.path.exists(file_path):
+        return jsonify({
+            "success": False,
+            "message": "文件保存失败"
+        }), 500
+
+    try:
+        indices = load_index_base('../index_base/local')  # 加载索引
+        print("索引加载成功:", indices.keys())  # 打印加载的索引文件名
+    except Exception as e:
+        print("索引加载失败:", str(e))
+        raise
+
+    try:
+        topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({
+            "success": False,
+            "message": f"匹配失败: {str(e)}"
+        }), 500
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    base_url = request.host_url + "data/base/"
+    results = [{"name": name, "url": base_url + name, "score": score} for name, score in topn]
+
+    return jsonify({
+        "success": True,
+        "message": "图片接受成功",
+        "results": results
+    }), 200
+'''
 @app.route('/match', methods=['POST'])
 def match():
     # 检查 Authorization 请求头
@@ -234,7 +281,7 @@ def match():
 
     # 加载索引并进行匹配
     try:
-        indices = load_index_base('../index_base')  # 加载索引
+        indices = load_index_base('../index_base/local')  # 加载索引
         topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
     except Exception as e:
         # 删除临时文件
@@ -259,7 +306,7 @@ def match():
         "message": "图片接受成功",
         "results": results  # 返回匹配结果
     }), 200
-        
+        '''
 
 
 @app.before_request#请求前处理函数，通过g这个变量存储数据库连接

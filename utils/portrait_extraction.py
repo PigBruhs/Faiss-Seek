@@ -1,10 +1,11 @@
+import io
+
+import faiss
+import numpy as np
 import torch
 import torchvision.transforms as transforms
-from torchvision.models import resnet50
 from PIL import Image
-import numpy as np
-import faiss
-import io
+from torchvision.models import resnet50, vit_b_16,vgg16
 
 
 def resnet50_feature_extractor(image_path=None, image=None,max_dim=1024):
@@ -73,9 +74,116 @@ def resnet50_feature_extractor(image_path=None, image=None,max_dim=1024):
     return index
 
 
+def vit_b_16_feature_extractor(image_path=None, image=None, max_dim=1024):
+    # 1. 预处理
+    preprocess = transforms.Compose([
+        transforms.Lambda(lambda img: img.convert('RGB')),  # 强制转RGB
+        transforms.Lambda(lambda img: img.resize(  # 智能尺寸限制
+            (224,224),
+            Image.LANCZOS)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
+    if image is not None:
+        img = Image.open(io.BytesIO(image)) if isinstance(image, bytes) else image
+    elif image_path is not None:
+        img = Image.open(image_path)
+    else:
+        raise ValueError("必须提供 image_path 或 image 参数")
+    input_tensor = preprocess(img).unsqueeze(0)
+
+    # 2. 加载模型权重
+    model = vit_b_16(weights=None)
+    checkpoint = torch.load("../pretrained/imagenet21k+imagenet2012_ViT-B_16-224.pth", map_location='cpu')
+    state_dict = checkpoint.get('state_dict', checkpoint)
+    model.load_state_dict(state_dict, strict=False)
+    model.eval()
+
+    # 3. 手动执行 forward_features
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    input_tensor = input_tensor.to(device)
+    with torch.no_grad():
+        # 直接用已预处理的 input_tensor，保证通道数为 3
+        x = input_tensor
+        x = model.conv_proj(x)  # 输出 (B, C, H, W)
+        B, C, H, W = x.shape
+        x = x.flatten(2).transpose(1, 2)  # (B, N, C)
+        cls_token = model.class_token.expand(B, -1, -1)
+        x = torch.cat((cls_token, x), dim=1)  # (B, N+1, C)
+        x = x + model.encoder.pos_embedding
+        x = model.encoder.dropout(x)
+        for block in model.encoder.layers:
+            x = block(x)
+        x = model.encoder.ln(x)
+        features = x[:, 0]  # 取 [CLS] token
+
+    # 4. 构建 Faiss 索引
+    feats = features.cpu().numpy().astype('float32')
+    faiss.normalize_L2(feats)
+    index = faiss.IndexFlatIP(feats.shape[1])
+    index.add(feats)
+
+    return index
+
+def vgg16_feature_extractor(image_path=None, image=None, max_dim=1024):
+
+    # 图像预处理流水线
+    preprocess = transforms.Compose([
+        transforms.Lambda(lambda img: img.convert('RGB')),
+        transforms.Lambda(lambda img: img.resize(
+            (max_dim, max_dim) if max(img.size) > max_dim else img.size,
+            Image.LANCZOS)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
+
+    # 加载图像
+    if image is not None:
+        img = Image.open(io.BytesIO(image)) if isinstance(image, bytes) else image
+    elif image_path is not None:
+        img = Image.open(image_path)
+    else:
+        raise ValueError("必须提供 image_path 或 image 参数")
+
+    # 预处理
+    input_tensor = preprocess(img).unsqueeze(0)
+
+    # 初始化模型并加载预训练权重(可替换为自定义权重)
+    model = vgg16(weights=None)
+    checkpoint_path = '../pretrained/vgg16-397923af.pth'  # 示例路径
+    state_dict = torch.load(checkpoint_path)
+    model.load_state_dict(state_dict)
+
+    # 截断模型至最后一层卷积输出后
+    feature_extractor = torch.nn.Sequential(*list(model.features.children()))
+    feature_extractor.eval()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    feature_extractor.to(device)
+    input_tensor = input_tensor.to(device)
+
+    # 特征提取
+    with torch.no_grad():
+        features = feature_extractor(input_tensor)
+
+    # 池化并转为二维数组
+    pooled = torch.nn.functional.adaptive_avg_pool2d(features, 1)
+    feats = pooled.squeeze().cpu().numpy()
+    feats = np.expand_dims(feats, axis=0)
+
+    # L2归一化并构建Faiss索引
+    faiss.normalize_L2(feats)
+    index = faiss.IndexFlatIP(feats.shape[1])
+    index.add(feats)
+
+    return index
+
 # 使用示例 ---------------------------------------------------
 if __name__ == "__main__":
-    features = resnet50_feature_extractor("../data/search/002_anchor_image_0001.jpg")
+    features = vgg16_feature_extractor("../data/search/002_anchor_image_0001.jpg")
     print(features)
 
 

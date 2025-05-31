@@ -5,42 +5,55 @@
             {{ message }}
         </div>
         <div class="home-container">
+            <SelectWeb :onSelectWeb="handleWebSelection" :setMessage="setMessage"/>
+            <AddWeb :addWebRequest="handleAddWebRequest" :setMessage="setMessage"/>
             <div class="upload-section">
                 <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
                 <div v-if="imageUrl" class="preview">
                     <img :src="imageUrl" alt="预览" class="preview-img" />
                     <button @click="removeImage">删除图片</button>
                 </div>
-                <button :disabled="!imageFile" @click="matchImage">匹配</button>
+                <div v-if="!isMatching">
+                    <button :disabled="!imageUrl" @click="startMatching">匹配</button>
+                </div>
+                <div v-else>
+                    <img :src="matchingImageUrl" alt="匹配中" class="matching-img" />
+                </div>
             </div>
             <div class="image-gallery" v-if="imageList.length > 0">
                 <h3>匹配结果：</h3>
                 <div class="image-grid">
-                    <div class="image-item" v-for="(image, index) in imageList" :key="index">
-                        <img :src="image.url" :alt="image.name" />
-                        <p>{{ image.name }} (相似度: {{ (image.score * 100).toFixed(2) }}%)</p>
-                    </div>
+                    <ImageDiv v-for="(image, index) in imageList" :key="index" :imageSrc1="image.url"
+                        :imageTitle="image.name" :imageDescription="'匹配分数: ' + image.score.toFixed(2)"
+                        :tooltipContent="'图片名称: ' + image.name" />
                 </div>
             </div>
         </div>
-
+        <!-- 添加一个空的 div 容器 -->
+        <div class="bottom-space"></div>
     </div>
 </template>
 
 <script>
+import AddWeb from "./scomponents/AddWeb.vue";
+import ImageDiv from "./scomponents/ImageDiv.vue";
 import HeaderTopAfterLogin from "./scomponents/HeaderTopAfterLogin.vue";
 import axios from "axios";
+import SelectWeb from "./scomponents/SelectWeb.vue";
 
 export default {
-    components: { HeaderTopAfterLogin },
+    components: { ImageDiv, HeaderTopAfterLogin, SelectWeb ,AddWeb},
     data() {
         return {
+            imageFile: null, // 存储上传的图片文件
+            imageUrl: null, // 存储图片预览的 URL
+            imageList: [], // 存储后端返回的匹配结果
+            isMatching: false, // 是否正在匹配
+            matchingImageUrl: "", // 匹配中显示的图片 URL
             message: "",
-            imageFile: null,
-            imageUrl: null,
-            imageList: [], // 用于存储后端返回的图片列表
-            userId: "",
-            role: "",
+            messageType: "",
+            userId: "", // 用户 ID
+            SelectWeb: "", // 选择的网页
         };
     },
     methods: {
@@ -50,6 +63,11 @@ export default {
             localStorage.removeItem("role"); // 清除用户组
             this.updateUserId(); // 更新用户信息
             this.$router.push({ path: "/Login" }); // 跳转到登录页面
+        },
+        handleWebSelection(webName) {
+            this.SelectWeb = webName; // 接收子组件传递的网页名字
+            this.setMessage(`已选择网页: ${webName}`, "success");
+            console.log("用户选择的网页:", webName);
         },
         setMessage(content, type) {
             this.message = content;
@@ -64,44 +82,70 @@ export default {
             if (file) {
                 this.imageFile = file;
                 this.imageUrl = URL.createObjectURL(file);
+                this.isMatching = false; // 上传新图片时重置匹配状态
             }
         },
         removeImage() {
             this.imageFile = null;
             this.imageUrl = null;
+            this.isMatching = false; // 删除图片时重置匹配状态
             this.$refs.fileInput.value = "";
         },
-        async matchImage() {
+        async handleAddWebRequest(webData) {
+            // 处理添加网页请求
+            try {
+                const response = await axios.post("http://localhost:19198/addWeb", webData, {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    },
+                });
+                if (response.data.success) {
+                    this.setMessage("网页添加请求已提交", "success");
+                } else {
+                    this.setMessage(response.data.message || "添加网页请求失败", "error");
+                }
+            } catch (error) {
+                console.error("添加网页请求失败:", error);
+                this.setMessage("网络错误，请稍后重试", "error");
+            }
+        },
+        async startMatching() {
             if (!this.imageFile) return;
+
+            // 设置匹配状态为 true，显示占位图片
+            this.isMatching = true;
+            this.matchingImageUrl = "/src/assets/images/search.gif"; // 设置匹配中占位图片
+
             const formData = new FormData();
             formData.append("image", this.imageFile);
-            try {
-                // 获取 token
-                const token = localStorage.getItem("token");
 
-                // POST 请求发送图片，附带 token
+            try {
                 const res = await axios.post("http://localhost:19198/match", formData, {
                     headers: {
+                        SelectWeb: this.SelectWeb, // 传递选择的网页
                         "Content-Type": "multipart/form-data",
-                        "Authorization": `Bearer ${token}`, // 添加 token 到请求头
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
 
-                // 检查后端返回的数据
-                if (res.data.success && res.data.results.length > 0) {
-                    this.imageList = res.data.results; // 将返回的图片列表存储到 imageList
-                    this.setMessage("图片匹配成功", "success");
-                } else if (res.data.success && res.data.results.length === 0) {
-                    this.setMessage("未找到匹配的图片", "warning");
+                if (res.data.success) {
+                    this.imageList = res.data.results;
+                    this.setMessage("匹配成功", "success");
+                    this.matchingImageUrl = "/src/assets/images/searchfinished.gif"; // 设置匹配完成的图片
                 } else {
-                    this.setMessage(res.data.message || "图片匹配失败", "error");
+                    this.setMessage(res.data.message || "匹配失败", "error");
+                    this.resetMatching();
                 }
-
-                console.log("匹配结果:", this.imageList); // 打印匹配结果
             } catch (err) {
-                console.error("图片匹配失败:", err);
-                this.setMessage("图片匹配失败，请稍后重试", "error");
+                console.error("匹配失败:", err);
+                this.setMessage("匹配失败，请稍后重试", "error");
+                this.resetMatching();
             }
+        },
+        resetMatching() {
+            // 恢复匹配按钮
+            this.isMatching = false;
+            this.matchingImageUrl = "";
         },
 
         async checkTokenValidity() {
@@ -156,12 +200,10 @@ export default {
 .background {
     min-height: 100vh;
     width: 100vw;
-    /* 你的背景图片等样式可继续保留 */
 }
 
 .home-container {
     padding-top: 140px;
-    /* 预留HeaderTop高度+间距 */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -189,42 +231,76 @@ export default {
     margin-bottom: 10px;
 }
 
+.matching-img {
+    max-width: 100%;
+    height: auto;
+    margin-top: 20px;
+    border: 2px dashed #007bff;
+    border-radius: 10px;
+    padding: 10px;
+    background-color: #f8f9fa;
+}
+
 .image-gallery {
     margin-top: 40px;
-    width: 95%; /* 增加容器宽度 */
+    width: 90%;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 14px;
+    color: #ffffff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+input[type="file"] {
+    display: block;
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
 }
 
 .image-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* 每行展示 3 张图片 */
-    gap: 150px; /* 缩小图片之间的间距 */
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    justify-items: center;
+    align-items: start;
 }
 
-.image-item {
-    display: flex;
-    flex-direction: column; /* 让图片和文字垂直排列 */
-    justify-content: center; /* 水平居中图片 */
-    align-items: center; /* 垂直居中图片 */
-    text-align: center;
-    width: 100%; /* 占满父容器 */
-    height: 500px; /* 固定容器高度 */
-    overflow: hidden; /* 隐藏超出容器的部分 */
+.bottom-space {
+    height: 200px;
+    /* 设置底部空白区域的高度 */
 }
-
-.image-item img {
-    width: auto; /* 图片宽度自适应 */
-    height: 100%; /* 图片高度占满容器 */
-    object-fit: contain; /* 保持图片长宽比，显示完整内容 */
-    border: 1px solid #ccc;
+.message-box {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 10px;
     border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-.image-item p {
-    margin-top: 30px; /* 文字与图片之间的间距 */
     font-size: 14px;
-    color: #333;
     text-align: center;
+    width: 80%;
+    max-width: 600px;
+    color: white;
 }
 
 .message-box.success {
@@ -243,9 +319,5 @@ export default {
     background-color: #fff3cd;
     color: #856404;
     border: 1px solid #ffeeba;
-}
-
-button {
-    margin-right: 10px;
 }
 </style>
