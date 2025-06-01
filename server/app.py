@@ -5,8 +5,8 @@ import os
 import sqlite3
 import faiss
 from flask import send_from_directory
-from login import login
-from register import register
+from authService import auth
+from tokenService import tokenService
 from werkzeug.utils import secure_filename
 from typing import Dict
 
@@ -15,10 +15,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.index_base import load_index_base
 from utils.index_search import search_topn
 from flask import Flask, request, jsonify
-
+from dbService import cnnect_db
+from imageService import imageService
 app = Flask(__name__)
 CORS(app)
-users_db = {}#数据库连接函数
+users_db = {}#数据库连接函数???
 UPLOAD_ADDRESS = 'data/upload'
 app.config['UPLOAD_ADDRESS'] = UPLOAD_ADDRESS
 if not os.path.exists(UPLOAD_ADDRESS):
@@ -43,12 +44,6 @@ def load_index_base(index_folder: str) -> Dict[str, faiss.IndexFlatIP]:
             path = os.path.join(index_folder, file)
             indices[name] = faiss.read_index(path)
     return indices
-
-def cnnect_db():
-    db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
-    db = sqlite3.connect(db_path)
-    db.row_factory = sqlite3.Row
-    return db
 
 def init_db(): #使用数据库建模文件初始化数据库，在命令行中使用一次即可。
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
@@ -80,23 +75,18 @@ def protected():
 
     token = auth_header.split(" ")[1]  # 提取 Token
     # 验证 Token（示例代码，实际需要根据你的逻辑验证 Token）
-    db = cnnect_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM users WHERE token = ?", (token,))
-    user = cursor.fetchone()
-    db.close()
-
-    if not user:
+    result=tokenService.IsUser(token)
+    if not result:
         return jsonify({
             "success": False,
             "message": "Token 无效或已过期"
         }), 401
-
-    # 如果 Token 验证成功
-    return jsonify({
-        "success": True,
-        "message": "Token 验证成功"
-    }), 200
+    else:
+        # 如果 Token 验证成功
+        return jsonify({
+            "success": True,
+            "message": "Token 验证成功"
+        }), 200
 
 @app.route('/register', methods=['POST'])
 def register_():
@@ -111,7 +101,7 @@ def register_():
         }), 400
 
     else:   
-        result=register(data['userId'], data['password']) # 直接返回前端需要的响应格式
+        result=auth.Register(data['userId'], data['password']) # 直接返回前端需要的响应格式
         print("注册数据:",result)
         if result[0]:
             return jsonify({
@@ -137,7 +127,7 @@ def login_():
 
     else:    # 直接返回前端需要的响应格式
       print(data)#打印接受到的数据，确认数据是什么类型的
-      result = login(data['userId'], data['password'])  # 调用登录函数
+      result = auth.Login(data['userId'], data['password'])  # 调用登录函数
       if result[0]:
           print(data)
           return jsonify({
@@ -163,18 +153,13 @@ def match():
         }), 401
 
     token = auth_header.split(" ")[1]  # 提取 Token
-    db = cnnect_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM users WHERE token = ?", (token,))
-    user = cursor.fetchone()
-    db.close()
-
-    if not user:
+    result=tokenService.IsUser(token)#验证token
+    if not result:
         return jsonify({
             "success": False,
             "message": "Token 无效或已过期"
         }), 401
-
+   
     # 获取上传的图片
     file = request.files.get('image')
     if not file:
@@ -182,51 +167,69 @@ def match():
             "success": False,
             "message": "未接收到文件"
         }), 400
-
-    filename = secure_filename(file.filename)
-    if '.' not in filename:
-        filename += '.jpg'
-
-    temp_dir = '../data/temp'
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
-    file_path = os.path.join(temp_dir, filename)
-    file.save(file_path)
-
-    if not os.path.exists(file_path):
+    result=imageService.imageMatch(file)
+    if not result["success"]:
         return jsonify({
             "success": False,
-            "message": "文件保存失败"
-        }), 500
-
-    try:
-        indices = load_index_base('../index_base/local')  # 加载索引
-        print("索引加载成功:", indices.keys())  # 打印加载的索引文件名
-    except Exception as e:
-        print("索引加载失败:", str(e))
-        raise
-
-    try:
-        topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
-    except Exception as e:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+            "message": result["message"],
+        }), 401
+    elif result.get("result"):
+        return jsonify({
+            "success": True,
+            "message": result["message"],
+            "results":result["result"],
+        }), 200
+    else:
         return jsonify({
             "success": False,
-            "message": f"匹配失败: {str(e)}"
-        }), 500
+            "message": result["message"],
+        }), 400
 
-    if os.path.exists(file_path):
-        os.remove(file_path)
+    # #将文件保存到值得文件夹里
+    # filename = secure_filename(file.filename)
+    # if '.' not in filename:
+    #     filename += '.jpg'
 
-    base_url = request.host_url + "data/base/"
-    results = [{"name": name, "url": base_url + name, "score": score} for name, score in topn]
+    # temp_dir = '../data/temp'
+    # if not os.path.exists(temp_dir):
+    #     os.makedirs(temp_dir)
+    # file_path = os.path.join(temp_dir, filename)
+    # file.save(file_path)
 
-    return jsonify({
-        "success": True,
-        "message": "图片接受成功",
-        "results": results
-    }), 200
+    # if not os.path.exists(file_path):
+    #     return jsonify({
+    #         "success": False,
+    #         "message": "文件保存失败"
+    #     }), 500
+
+    # try:
+    #     indices = load_index_base('../index_base/local')  # 加载索引
+    #     print("索引加载成功:", indices.keys())  # 打印加载的索引文件名
+    # except Exception as e:
+    #     print("索引加载失败:", str(e))
+    #     raise
+
+    # try:
+    #     topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
+    # except Exception as e:
+    #     if os.path.exists(file_path):
+    #         os.remove(file_path)
+    #     return jsonify({
+    #         "success": False,
+    #         "message": f"匹配失败: {str(e)}"
+    #     }), 500
+
+    # if os.path.exists(file_path):
+    #     os.remove(file_path)
+
+    # base_url = request.host_url + "data/base/"
+    # results = [{"name": name, "url": base_url + name, "score": score} for name, score in topn]
+
+    # return jsonify({
+    #     "success": True,
+    #     "message": "图片接受成功",
+    #     "results": results
+    # }), 200
 '''
 @app.route('/match', methods=['POST'])
 def match():

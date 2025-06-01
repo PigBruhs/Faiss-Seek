@@ -2,12 +2,20 @@ from flask import Flask, request, jsonify,g
 from flask_cors import CORS
 import sqlite3
 import os
+import bcrypt
+
 base_id=0
 def record_exists(conn,table, column, value):
     cursor = conn.cursor()
     cursor.execute(f"SELECT {column} FROM {table} WHERE {column} = ?", (value,))
     exists = cursor.fetchone() is not None
     return exists
+
+
+# 加密密码hash256
+def hash_password(password):
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode(), salt).decode()
 
 
 def register(userId, password):
@@ -31,11 +39,12 @@ def register(userId, password):
         return False,"用户名已存在！"
     # print("原有的id:",id) 
     else:
+        hashPassword=hash_password(password)
         cursor.execute(
             """
             INSERT INTO users (id, userId, password,role,token) VALUES (?,?,?,?,?)
             """,
-            (new_id, userId, password,"user",None)#默认角色为user
+            (new_id, userId, hashPassword,"user",None)#默认角色为user
         )#插入新用户的数据
     data = cursor.execute(
         """
