@@ -53,3 +53,4 @@ __pycache__/
 *.pth
 src/components.d.ts
 pretrained/imagenet21k+imagenet2012_ViT-B_16-224.pth
+server/database/database.db
