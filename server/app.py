@@ -9,6 +9,7 @@ from authService import auth
 from tokenService import tokenService
 from werkzeug.utils import secure_filename
 from typing import Dict
+import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -16,6 +17,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from flask import Flask, request, jsonify
 from dbService import cnnect_db
 from imageService import ImageService
+from webListService import webListService
+
 app = Flask(__name__)
 CORS(app)
 users_db = {}#数据库连接函数???
@@ -187,51 +190,7 @@ def match():
             "message": result["message"],
         }), 400
 
-    # #将文件保存到值得文件夹里
-    # filename = secure_filename(file.filename)
-    # if '.' not in filename:
-    #     filename += '.jpg'
-
-    # temp_dir = '../data/temp'
-    # if not os.path.exists(temp_dir):
-    #     os.makedirs(temp_dir)
-    # file_path = os.path.join(temp_dir, filename)
-    # file.save(file_path)
-
-    # if not os.path.exists(file_path):
-    #     return jsonify({
-    #         "success": False,
-    #         "message": "文件保存失败"
-    #     }), 500
-
-    # try:
-    #     indices = load_index_base('../index_base/local')  # 加载索引
-    #     print("索引加载成功:", indices.keys())  # 打印加载的索引文件名
-    # except Exception as e:
-    #     print("索引加载失败:", str(e))
-    #     raise
-
-    # try:
-    #     topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
-    # except Exception as e:
-    #     if os.path.exists(file_path):
-    #         os.remove(file_path)
-    #     return jsonify({
-    #         "success": False,
-    #         "message": f"匹配失败: {str(e)}"
-    #     }), 500
-
-    # if os.path.exists(file_path):
-    #     os.remove(file_path)
-
-    # base_url = request.host_url + "data/base/"
-    # results = [{"name": name, "url": base_url + name, "score": score} for name, score in topn]
-
-    # return jsonify({
-    #     "success": True,
-    #     "message": "图片接受成功",
-    #     "results": results
-    # }), 200
+    #
 '''
 @app.route('/match', methods=['POST'])
 def match():
@@ -313,6 +272,72 @@ def match():
     }), 200
         '''
 
+
+@app.route('/getWebList', methods=['POST'])
+def getWebList():
+    #token验证
+    auth_header = request.headers.get('Authorization')
+    print("Authorization:", auth_header)
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({
+            "success": False,
+            "message": "缺少或无效的 Token"
+        }), 401
+
+    token = auth_header.split(" ")[1]  # 提取 Token
+    # 验证 Token（示例代码，实际需要根据你的逻辑验证 Token）
+    tokenResult=tokenService.IsUser(token)
+    if not tokenResult:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+    else:
+        # 如果 Token 验证成功
+        result = webListService.getWebList()
+        print("获取网站的处理结果是：",result)
+        return jsonify({
+            "success":result['success'],
+            "webList":result['webList']
+        }),200
+  
+    
+@app.route('/addWeb', methods=['POST'])
+def addWeb():
+     #token验证
+    auth_header = request.headers.get('Authorization')
+    print("Authorization:", auth_header)
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({
+            "success": False,
+            "message": "缺少或无效的 Token"
+        }), 401
+
+    token = auth_header.split(" ")[1]  # 提取 Token
+    # 验证 Token（示例代码，实际需要根据你的逻辑验证 Token）
+    tokenResult=tokenService.IsUser(token)
+    if not tokenResult:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+    else:
+        # 如果 Token 验证成功
+        print("请求体内容是：",request.data)
+        data=request.get_json(force=True)
+        print("获取到的网站数据",data)
+        if data is not None:
+            result=webListService.addWeb(data)
+            return jsonify({
+                "success":result['success'],
+                "message":result['message']
+            }),200
+        else:
+            return jsonify({
+                 "success": False,
+                 "message": "后端数据接收失败"
+            }),401
+    
 
 @app.before_request#请求前处理函数，通过g这个变量存储数据库连接
 def before_request():

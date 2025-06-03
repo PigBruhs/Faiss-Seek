@@ -6,7 +6,7 @@
         </div>
         <div class="home-container">
             <SelectWeb :onSelectWeb="handleWebSelection" :setMessage="setMessage"/>
-            <AddWeb :addWebRequest="handleAddWebRequest" :setMessage="setMessage"/>
+            <AddWeb :setMessage="setMessage"/>
             <div class="upload-section">
                 <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
                 <div v-if="imageUrl" class="preview">
@@ -90,24 +90,6 @@ export default {
             this.imageUrl = null;
             this.isMatching = false; // 删除图片时重置匹配状态
             this.$refs.fileInput.value = "";
-        },
-        async handleAddWebRequest(webData) {
-            // 处理添加网页请求
-            try {
-                const response = await axios.post("http://localhost:19198/addWeb", webData, {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                    },
-                });
-                if (response.data.success) {
-                    this.setMessage("网页添加请求已提交", "success");
-                } else {
-                    this.setMessage(response.data.message || "添加网页请求失败", "error");
-                }
-            } catch (error) {
-                console.error("添加网页请求失败:", error);
-                this.setMessage("网络错误，请稍后重试", "error");
-            }
         },
         async startMatching() {
             if (!this.imageFile) return;

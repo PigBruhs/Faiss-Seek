@@ -54,3 +54,4 @@ __pycache__/
 src/components.d.ts
 pretrained/imagenet21k+imagenet2012_ViT-B_16-224.pth
 server/database/database.db
+index_base/local/vit16/2012_002056.jpg.index
