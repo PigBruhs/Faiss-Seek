@@ -11,6 +11,8 @@ class WebListService:
         return GetWbebList()
     def addWeb(self,data):
         return AddWeb(data)
+    def webRequestList(self):
+        return WebRequestList()
        
 
 
@@ -87,6 +89,25 @@ def AddWeb(data):
         print("插入数据失败")
         db.close()
         result={'success':False,'message':'提交失败'}
+        return result
+    
+def WebRequestList():
+    db=cnnect_db()
+    cursor=db.cursor()
+    cursor.execute(
+        '''
+        SELECT id,name,url,info FROM webs WHERE is_approved= ?
+        ''',(0,)
+    )
+    web_request_list=cursor.fetchall()
+    print("获取到的数据：",web_request_list)
+    if  web_request_list:
+        result={'success':True,'webRequestList':web_request_list}
+        db.close()
+        return result
+    else:
+        result={'success':False,'webRequestList':web_request_list}
+        db.close()
         return result
     
     
