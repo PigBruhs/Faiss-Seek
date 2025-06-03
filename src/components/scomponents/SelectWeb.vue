@@ -49,7 +49,9 @@ export default {
         }
         const fetchWebList = async () => {
             try {
-                const response = await axios.post("http://localhost:19198/getWebList", {
+                const response = await axios.post("http://localhost:19198/getWebList",
+                 {},//请求体为空对象
+                 {
                     headers: {
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },

@@ -41,10 +41,6 @@ import axios from "axios";
 
 export default {
     props: {
-        addWebRequest: {
-            type: Function,
-            required: true, // 父组件传递回调函数
-        },
         setMessage: {
             type: Function,
             required: true, // 父组件传递回调函数
@@ -69,7 +65,9 @@ export default {
         const handleOk = () => {
             visible.value = false;
             if (role == "user" && webName.value && webUrl.value) {
-                props.addWebRequest(webName.value, webUrl.value, webInfo.value); // 调用父组件传递的回调函数
+                submitWebInfo(); // 如果是 user，提交网站信息
+            } else if (role === "user") {
+                props.setMessage("请填写完整的网站信息！", "warning");
             } else if (role === "admin") {
                 fetchWebRequestList(); // 如果是 admin，重新获取请求列表
             }
@@ -87,6 +85,7 @@ export default {
                     info: webInfo.value,
                 }, {
                     headers: {
+                        "Content-Type": "application/json", // 必须加上这行
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
