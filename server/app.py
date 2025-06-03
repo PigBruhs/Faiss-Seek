@@ -169,7 +169,7 @@ def match():
             "success": False,
             "message": "未接收到文件"
         }), 400
-    result= imgservice.img_search(file)
+    result= imgservice.img_search(file, model="vgg16", top_n=5)  # 调用图片搜索服务
     if not result["success"]:
         return jsonify({
             "success": False,
