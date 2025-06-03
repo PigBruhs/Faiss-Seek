@@ -8,7 +8,7 @@
             <div v-for="web in webList" :key="web.id" class="web-item">
                 <label>
                     <input type="radio" :value="web.name" v-model="selectedWeb" />
-                    {{ web.name }}
+                    {{ web.name }}网站类型{{ web.type }}
                 </label>
             </div>
         </div>
@@ -57,7 +57,7 @@ export default {
                     },
                 });
                 if (response.success) {
-                    webList = response.data.webList; // 假设返回的数据是一个数组
+                    webList.value = response.data.webList; // 假设返回的数据是一个数组
                 }
                 else {
                     console.error("获取网页列表失败:", response.message);
