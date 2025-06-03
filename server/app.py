@@ -16,7 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, request, jsonify
 from dbService import cnnect_db
-from imageService import imageService
+from imageService import ImageService
 from webListService import webListService
 
 app = Flask(__name__)
