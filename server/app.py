@@ -13,12 +13,12 @@ import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.index_base import load_index_base
-from utils.index_search import search_topn
+
 from flask import Flask, request, jsonify
 from dbService import cnnect_db
 from imageService import imageService
 from webListService import webListService
+
 app = Flask(__name__)
 CORS(app)
 users_db = {}#数据库连接函数???
@@ -26,6 +26,9 @@ UPLOAD_ADDRESS = 'data/upload'
 app.config['UPLOAD_ADDRESS'] = UPLOAD_ADDRESS
 if not os.path.exists(UPLOAD_ADDRESS):
     os.makedirs(UPLOAD_ADDRESS)
+
+global imgservice
+imgservice= ImageService()
 
 @app.route('/data/base/<path:filename>')
 def serve_image(filename):
@@ -169,7 +172,7 @@ def match():
             "success": False,
             "message": "未接收到文件"
         }), 400
-    result=imageService.imageMatch(file)
+    result= imgservice.img_search(file)
     if not result["success"]:
         return jsonify({
             "success": False,
