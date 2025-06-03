@@ -7,17 +7,14 @@ import faiss
 import sys
 import shutil
 
-import numpy as np
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.portrait_extraction import resnet50_feature_extractor, vit_b_16_feature_extractor,vgg16_feature_extractor
+from utils.feature_extraction import feature_extractor
 
-def build_index_base(input_folder: str, index_folder: str,model = "vgg16") -> bool:
+def build_index_base(input_folder: str, index_folder: str, model = "vgg16", fe=None) -> bool:
     # 清理并创建索引输出目录
-    local_dir = os.path.join(index_folder, 'local')
-    if os.path.isdir(local_dir):
-        shutil.rmtree(local_dir)
-    os.makedirs(local_dir, exist_ok=True)
+    if os.path.isdir(index_folder):
+        shutil.rmtree(index_folder)
+    os.makedirs(index_folder, exist_ok=True)
 
     success = True
     exts = ('.jpg', '.jpeg', '.png', '.bmp')
@@ -27,15 +24,10 @@ def build_index_base(input_folder: str, index_folder: str,model = "vgg16") -> bo
             continue
         path = os.path.join(input_folder, fname)
         try:
-            # 提取特征并转为 (1, d) 的 float32 数组
-            if model == "resnet50":
-                feat = resnet50_feature_extractor(image_path=path)
-            elif model == "vit16":
-                feat = vit_b_16_feature_extractor(image_path=path)
-            elif model == "vgg16":
-                feat = vgg16_feature_extractor(image_path=path)
 
-            faiss.write_index(feat, os.path.join(local_dir, f"{fname}.index"))
+            feat = fe.extract(image_path=path, model=model)
+
+            faiss.write_index(feat, os.path.join(index_folder, f"{fname}.index"))
         except Exception as e:
             print(f"Failed to process {fname}: {e}")
             success = False
