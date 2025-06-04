@@ -13,6 +13,8 @@ class WebListService:
         return AddWeb(data)
     def webRequestList(self):
         return WebRequestList()
+    def approve(self,data):
+        return ApproveWeb(data)
        
 
 
@@ -41,10 +43,20 @@ def GetWbebList():
     )
     print("如果数据库不存在则创建数据库")
     data=cursor.fetchall()
+    webList=[]
     if data is not None:
         print("获取到了数据库数据：",data)
+        #将数据转化为字典
+        for i in data:
+            j={
+            "id":i[0],
+            "name":i[1],
+            "type":i[2],
+
+        }
+            webList.append(j)
         db.close()
-        result={"success":True,"webList":data}
+        result={"success":True,"webList":webList}
         return result
     else:
         result={'success':False,"webList":{}}
@@ -99,9 +111,19 @@ def WebRequestList():
         SELECT id,name,url,info FROM webs WHERE is_approved= ?
         ''',(0,)
     )
-    web_request_list=cursor.fetchall()
-    print("获取到的数据：",web_request_list)
-    if  web_request_list:
+    data=cursor.fetchall()
+    #转化为字典列表
+    web_request_list=[]
+    if  data is not None:
+        for i in data:
+                j={
+                "id":i[0],
+                "name":i[1],
+                "url":i[2],
+                "info":i[3],
+            }
+                web_request_list.append(j)
+        print("获取到的数据：",web_request_list)
         result={'success':True,'webRequestList':web_request_list}
         db.close()
         return result
@@ -110,4 +132,33 @@ def WebRequestList():
         db.close()
         return result
     
+def ApproveWeb(data):
+    #查看获取到的数据
+    print("获取到的要更改的词条的数据:",data)
+    db=cnnect_db()
+    cursor=db.cursor()
+    #修改数据
+    cursor.execute(
+        '''
+        UPDATE webs set is_approved=?,type=? where url=?
+        ''',(1,data['type'],data['url'])
+    )
+    #查询数据是否修改成功
+    cursor.execute(
+        '''
+        SELECT *  FROM webs where url=? AND is_approved=?
+        ''',(data['url'],1)
+    )
+    data2=cursor.fetchone()
+    print("在数据库中查找是否修改成功，结果是：",data2)
+    if data2:
+        result={'success':True,'message':"审核通过"}
+        db.commit()
+        db.close()
+        return result
+    else:
+        result={'success':False,'message':"数据修改失败"}
+        db.close()
+        return result
     
+
