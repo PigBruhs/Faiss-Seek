@@ -1,5 +1,3 @@
-
-from tqdm import tqdm
 import os
 
 
@@ -19,7 +17,7 @@ def build_index_base(input_folder: str, index_folder: str, model = "vgg16", fe=N
     success = True
     exts = ('.jpg', '.jpeg', '.png', '.bmp')
 
-    for fname in tqdm(os.listdir(input_folder), desc='Building indices'):
+    for fname in os.listdir(input_folder):
         if not fname.lower().endswith(exts):
             continue
         path = os.path.join(input_folder, fname)

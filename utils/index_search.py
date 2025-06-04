@@ -21,7 +21,9 @@ class searcher:
             image=None,
             top_n: int = 5,
             model="vgg16",
-            fe=None
+            fe=None,
+            mode="local",
+            name=None
     ) -> list[tuple[str, float]]:
         """
         在 index_base（名称->单向量索引）中，检索与给定图片最相似的前 top_n 个结果。
@@ -34,7 +36,12 @@ class searcher:
         返回：
           List[(名称, 相似度)]
         """
-        index_base = load_index_base(f"../index_base/local/{model}")
+        if mode == "local":
+            index_base = load_index_base(f"../index_base/local/{model}")
+        elif mode == "url":
+            index_base = load_index_base(f"../index_base/url/{name}/{model}")
+        else:
+            raise ValueError("Unsupported mode. Use 'local' or 'url'.")
         query_img = fe.extract(image_path=image_path, image=image, model=model)
 
         query_vec = query_img.reconstruct_n(0, 1).astype(np.float32)
@@ -68,16 +75,17 @@ class searcher:
         return results
 
 
-
-
+"""
 if __name__ == "__main__":
-    # 测试代码
- 
-    image_path = "../data/search/002_anchor_image_0001.jpg"
-    from utils.index_base import load_index_base
-    indices = load_index_base("../index_base/local")
-    results = search_topn(indices,image_path=image_path, top_n=5, model="vit16")
+    # 测试用例
+    from utils.feature_extraction import feature_extractor
+    test_image = "../data/search/002_anchor_image_0001.jpg"
+    from PIL import Image
+    fe = feature_extractor()
+    results = searcher.search_topn(image=Image.open(test_image), model="vgg16", fe=fe, top_n=5, mode="url", name="test_index")
     print(results)
+"""
+
 
 
 

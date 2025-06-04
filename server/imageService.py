@@ -1,42 +1,118 @@
-from flask import Flask, request, jsonify,g
-from flask_cors import CORS
 import sys
 import os
-from werkzeug.utils import secure_filename
+import threading
+import queue
+from pathlib import Path
+import shutil
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.index_base import build_index_base,load_index_base
+from utils.index_base import build_index_base
 from utils.index_search import searcher
 from utils.feature_extraction import feature_extractor
+from utils.crawler import crawl_page,save_image
 from flask import Flask, request, jsonify
+from tqdm import tqdm
 
 class ImageService:
     def __init__(self):
         self.fe = feature_extractor()
-        build_index_base(input_folder="../data/base",index_folder= "../index_base/local/resnet50",fe=self.fe,model="resnet50")
-        build_index_base(input_folder="../data/base",index_folder= "../index_base/local/vit16",fe=self.fe,model="vit16")
-        build_index_base(input_folder="../data/base",index_folder= "../index_base/local/vgg16",fe=self.fe,model="vgg16")
         self.searcher = searcher()
+        self.task_queue = queue.Queue()
 
+    def download_images(self, url, name, max_imgs=128):
+        base_image_folder = Path(f"../crawled_images/{name}")  # 注意拼写是crawled_images
+        base_image_folder.mkdir(parents=True, exist_ok=True)
 
-    def img_search(self,img,model="vgg16",top_n=5):
+        total_batches = (max_imgs + 127) // 128
+        for batch_num in tqdm(range(total_batches)):
+            batch_folder = base_image_folder / f"batch_{batch_num}"
+            batch_folder.mkdir(parents=True, exist_ok=True)
+
+            temp_urls = crawl_page(url, min(128, max_imgs - batch_num * 128))
+            save_image(temp_urls, str(batch_folder))
+
+            # 通知索引线程处理新批次
+            self.task_queue.put(batch_num)
+
+        # 下载完成后发送终止信号
+        self.task_queue.put(None)
+
+    def index_images(self, name):
+        base_image_folder = Path(f"../crawled_images/{name}")  # 修正拼写：crawled_images
+        while True:
+            # 阻塞等待直到收到新任务
+            batch_num = self.task_queue.get()
+
+            # 检查终止信号
+            if batch_num is None:
+                self.task_queue.task_done()
+                break
+
+            batch_folder = base_image_folder / f"batch_{batch_num}"
+            index_folder = Path(f"../index_base/url/{name}")
+            index_folder.mkdir(parents=True, exist_ok=True)
+
+            for model in ["resnet50", "vgg16", "vit16"]:
+                build_index_base(
+                    input_folder=str(batch_folder),
+                    index_folder=str(index_folder / model),
+                    fe=self.fe,
+                    model=model
+                )
+
+            shutil.rmtree(batch_folder)
+            self.task_queue.task_done()
+
+    def reconstruct_index_base(self, name=None, url=None, max_imgs=32767):
         try:
-            topn = searcher.search_topn(img, model=model, top_n=top_n, fe=self.fe)
+            # 创建并启动线程
+            download_thread = threading.Thread(target=self.download_images, args=(url, name, max_imgs))
+            index_thread = threading.Thread(target=self.index_images, args=(name,))
+
+            # 先启动下载线程
+            download_thread.start()
+            # 稍等确保下载线程先运行
+            threading.Event().wait(0.1)
+            # 再启动索引线程
+            index_thread.start()
+
+            # 等待线程完成
+            download_thread.join()
+            index_thread.join()
+
+            return {"success": True, "message": f"{name} 索引库重建成功"}
+        except Exception as e:
+            print(f"索引库重建失败: {e}")
+            return {"success": False, "message": f"{name} 索引库重建失败"}
+
+
+    def img_search(self,img,model="vgg16",top_n=5,mode="local",name=None):
+        try:
+            topn = searcher.search_topn(image = img, model=model, top_n=top_n, fe=self.fe,mode=mode, name=name)
         except Exception as e:
             print("图片匹配失败")
-            result = {"success": False, "message": "图片匹配失败"}
+            result = {"success": False, "message": f"图片匹配失败，{e}"}
             return result
 
-        base_url = request.host_url + "data/base/"
-        results = [{"name": name, "url": base_url + name, "score": score} for name, score in topn]
+        results = [{"name": name,"score": score} for (name,score) in topn]
 
-        result = {"success": True, "message": "图片接受成功", "result": results}
-        return result
+        return results
 
 
 
+if __name__ == "__main__":
+    service = ImageService()
 
+    # 测试索引重建
+    result = service.reconstruct_index_base(name="test_index", url="https://www.hippopx.com/en/query?q=nature", max_imgs=128)
+    print(result)
+
+    # 测试图片搜索
+    from PIL import Image
+    test_image = Image.open("../data/search/002_anchor_image_0001.jpg")
+    search_result = service.img_search(test_image, model="vgg16", top_n=5, mode="url", name="test_index")
+    print(search_result)
 
 
 
