@@ -1,5 +1,10 @@
 <template>
-    <a-button type="primary" @click="handleClick">上传图源信息</a-button>
+    <div class="fixed-left-btn-container">
+    <div class="custom-vertical-btn" @click="handleClick">
+        <span class="vertical-text"v-if="role==='user'">选择匹配网页</span>
+        <span class="vertical-text" v-else>审核图源请求</span>
+        </div>
+        </div>
     <a-drawer :width="500" :visible="visible" @ok="handleOk" @cancel="handleCancel" :placement="position"
         unmountOnClose>
         <template #title>
@@ -208,5 +213,42 @@ export default {
     display: flex;
     gap: 10px;
     margin-top: 10px;
+}
+.fixed-left-btn-container {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+  /* 给容器一个固定宽度，保证按钮能完整展示 */
+  width: 60px;
+}
+/* 自定义一个“看起来像按钮”的 div */
+.custom-vertical-btn {
+  background-color: #1890ff;    /* Antd primary 颜色 */
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* 下面宽高根据文字多少调整，确保文字不会溢出 */
+  width: 30px;
+  height: 120px;
+  transition: background-color 0.2s;
+}
+.custom-vertical-btn:hover {
+  background-color: #40a9ff;
+}
+/* 竖排文字 */
+.vertical-text {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  color: white;
+  font-size: 14px;
+  line-height: 1.4;
+  user-select: none;
 }
 </style>
