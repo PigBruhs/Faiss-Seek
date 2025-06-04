@@ -6,3 +6,4 @@ class Auth:
     def Register(self,userId,password):
         return register(userId,password)
 auth=Auth()
+

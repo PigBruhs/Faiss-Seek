@@ -132,12 +132,14 @@ export default {
                 return;
             }
             try {
+                console.log(web.name)
                 const response = await axios.post("http://localhost:19198/approveWeb", {
                     name: web.name,
                     url: web.url,
                     type: siteType,
                     },{
                     headers: {
+                        "Content-Type": "application/json", // 必须加上这行
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
@@ -159,6 +161,7 @@ export default {
                     name: web.name,
                     url: web.url,},{
                     headers: {
+                        "Content-Type": "application/json", // 必须加上这行
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
