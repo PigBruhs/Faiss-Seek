@@ -2,6 +2,7 @@ import sys
 import os
 import threading
 import queue
+from PIL import Image
 from pathlib import Path
 import shutil
 
@@ -89,6 +90,7 @@ class ImageService:
 
     def img_search(self,img,model="vgg16",top_n=5,mode="local",name=None):
         try:
+            img = Image.open(img.stream).convert('RGB')  # ✅正确用法
             topn = searcher.search_topn(image = img, model=model, top_n=top_n, fe=self.fe,mode=mode, name=name)
         except Exception as e:
             print("图片匹配失败")
@@ -97,7 +99,11 @@ class ImageService:
 
         results = [{"name": name,"score": score} for (name,score) in topn]
 
-        return results
+        return {
+        "success": True,
+        "message": "图片匹配成功",
+        "result": results
+        }   
 
 
 

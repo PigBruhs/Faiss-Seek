@@ -1,7 +1,7 @@
 <template>
     <div class="fixed-left-btn-container">
     <div class="custom-vertical-btn" @click="handleClick">
-        <span class="vertical-text"v-if="role==='user'">选择匹配网页</span>
+        <span class="vertical-text"v-if="role==='user'">填写可选图源</span>
         <span class="vertical-text" v-else>审核图源请求</span>
         </div>
         </div>

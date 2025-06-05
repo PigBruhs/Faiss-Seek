@@ -60,8 +60,9 @@ export default {
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
-                if (response.success) {
+                if (response.data.success) {
                     webList.value = response.data.webList; // 假设返回的数据是一个数组
+                    console.log("获取网页列表成功:", webList.value);
                 }
                 else {
                     console.error("获取网页列表失败:", response.message);

@@ -53,7 +53,7 @@ export default {
             message: "",
             messageType: "",
             userId: "", // 用户 ID
-            SelectWeb: "", // 选择的网页
+            selectWeb: "", // 选择的网页
         };
     },
     methods: {
@@ -65,9 +65,8 @@ export default {
             this.$router.push({ path: "/Login" }); // 跳转到登录页面
         },
         handleWebSelection(webName) {
-            this.SelectWeb = webName; // 接收子组件传递的网页名字
+            this.selectWeb = webName; // 接收子组件传递的网页名字
             this.setMessage(`已选择网页: ${webName}`, "success");
-            console.log("用户选择的网页:", webName);
         },
         setMessage(content, type) {
             this.message = content;
@@ -100,11 +99,10 @@ export default {
 
             const formData = new FormData();
             formData.append("image", this.imageFile);
-
+            formData.append("selectWeb", this.selectWeb); // 将选择的网页类型添加到 FormData 中
             try {
                 const res = await axios.post("http://localhost:19198/match", formData, {
                     headers: {
-                        SelectWeb: this.SelectWeb, // 传递选择的网页
                         "Content-Type": "multipart/form-data",
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
@@ -113,6 +111,7 @@ export default {
                 if (res.data.success) {
                     this.imageList = res.data.results;
                     this.setMessage("匹配成功", "success");
+                    console.log("匹配结果:", this.imageList);
                     this.matchingImageUrl = "/src/assets/images/searchfinished.gif"; // 设置匹配完成的图片
                 } else {
                     this.setMessage(res.data.message || "匹配失败", "error");
