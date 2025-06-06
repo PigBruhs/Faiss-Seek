@@ -163,19 +163,14 @@ if __name__ == "__main__":
     service = ImageService()
 
     # 测试索引重建
-    """
-    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com/en/query?q=nature", max_imgs=128)
+    result = service.reconstruct_index_base(name="test_index", url="https://www.hippopx.com/en/query?q=nature", max_imgs=128)
     print(result)
-    
-    """
 
     # 测试图片搜索
     from PIL import Image
     test_image = Image.open("../data/search/002_anchor_image_0001.jpg")
     search_result = service.img_search(test_image, model="vgg16", top_n=5, mode="url", name="test_index")
     print(search_result)
-
-
 
 
 

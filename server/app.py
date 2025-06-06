@@ -34,6 +34,21 @@ imgservice= ImageService()
 def serve_image(filename):
     return send_from_directory('../data/base', filename)
 
+def load_index_base(index_folder: str) -> Dict[str, faiss.IndexFlatIP]:
+    """
+    扫描 index_folder 下所有 .index 文件，加载为 Faiss 索引，并以文件名(不含扩展)为 key 返回。
+    输入：
+        index_folder: 索引文件夹路径
+    返回：
+        Dict[str, faiss.IndexFlatIP], 文件名到索引的字典
+    """
+    indices: Dict[str, faiss.IndexFlatIP] = {}
+    for file in os.listdir(index_folder):
+        if file.lower().endswith(".index"):
+            name, _ = os.path.splitext(file)
+            path = os.path.join(index_folder, file)
+            indices[name] = faiss.read_index(path)
+    return indices
 
 def init_db(): #使用数据库建模文件初始化数据库，在命令行中使用一次即可。
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
