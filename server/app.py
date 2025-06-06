@@ -322,6 +322,7 @@ def approveWeb():
         result=webListService.approve(data)
         print("获取的结果是：",result)
         if result['success']:
+            imgservice.reconstruct_index_base(name=data['name'], path_or_url=data['url'], max_imgs=128)
             return jsonify({
             "success": result["success"],
             "message": result['message']
