@@ -5,40 +5,49 @@
             {{ message }}
         </div>
         <div class="home-container">
-            <SelectWeb :onSelectWeb="handleWebSelection" :setMessage="setMessage"/>
-            <AddWeb :setMessage="setMessage"/>
+            <SelectWeb :onSelectWeb="handleWebSelection" :setMessage="setMessage" />
+            <AddWeb :setMessage="setMessage" />
             <div class="upload-section">
                 <section-divider text="选择搜索模型" />
-                <PopBottom @onTitleClick="handleTitleClick"/>
+                <PopBottom @onTitleClick="handleTitleClick" />
                 <section-divider text="上传图片进行搜索" />
-                <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
-                <div v-if="imageUrl" class="preview">
-                    <img :src="imageUrl" alt="预览" class="preview-img" />
-                    <button @click="removeImage">删除图片</button>
+                <div class="dual-box-wrapper">
+                    <div class="left-box">
+                         <h3 style="margin-bottom: 10px;">选择图片数量</h3>
+                        <ImgSlide v-model="selectPectureNum" :max="100" :height="300" />
+                    </div>
+                    <div class="right-box">
+                        <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
+                        <div v-if="imageUrl" class="preview">
+                            <img :src="imageUrl" alt="预览" class="preview-img" />
+                            <button @click="removeImage">删除图片</button>
+                        </div>
+                        <div v-if="!isMatching">
+                            <button :disabled="!imageUrl" @click="startMatching">开始搜索</button>
+                        </div>
+                        <div v-else>
+                            <img :src="matchingImageUrl" alt="搜索中" class="matching-img" />
+                        </div>
+                    </div>
                 </div>
-                <div v-if="!isMatching">
-                    <button :disabled="!imageUrl" @click="startMatching">开始搜索</button>
-                </div>
-                <div v-else>
-                    <img :src="matchingImageUrl" alt="搜索中" class="matching-img" />
+                <section-divider text="搜索结果" />
+                <div class="image-gallery" v-if="imageList.length > 0">
+                    <h3>搜索结果：</h3>
+                    <div class="image-grid">
+                        <ImageDiv v-for="(image, index) in imageList" :key="index" :imageSrc1="image.url"
+                            :imageTitle="image.name" :imageDescription="'相似度: ' + image.score.toFixed(2)"
+                            :tooltipContent="'图片名称: ' + image.name" />
+                    </div>
                 </div>
             </div>
-            <section-divider text="搜索结果" />
-            <div class="image-gallery" v-if="imageList.length > 0">
-                <h3>搜索结果：</h3>
-                <div class="image-grid">
-                    <ImageDiv v-for="(image, index) in imageList" :key="index" :imageSrc1="image.url"
-                        :imageTitle="image.name" :imageDescription="'相似度: ' + image.score.toFixed(2)"
-                        :tooltipContent="'图片名称: ' + image.name" />
-                </div>
-            </div>
+            <!-- 添加一个空的 div 容器 -->
+            <div class="bottom-space"></div>
         </div>
-        <!-- 添加一个空的 div 容器 -->
-        <div class="bottom-space"></div>
     </div>
 </template>
 
 <script>
+import ImgSlide from "./scomponents/ImgSlide.vue";
 import SectionDivider from "./scomponents/SectionDivider.vue";
 import PopBottom from "./scomponents/PopBottom.vue";
 import AddWeb from "./scomponents/AddWeb.vue";
@@ -48,7 +57,7 @@ import axios from "axios";
 import SelectWeb from "./scomponents/SelectWeb.vue";
 
 export default {
-    components: { ImageDiv, HeaderTopAfterLogin, SelectWeb ,AddWeb, PopBottom, SectionDivider },
+    components: { ImageDiv, HeaderTopAfterLogin, SelectWeb, AddWeb, PopBottom, SectionDivider, ImgSlide },
     data() {
         return {
             imageFile: null, // 存储上传的图片文件
@@ -61,6 +70,7 @@ export default {
             userId: "", // 用户 ID
             selectWeb: "", // 选择的网页
             selectModel: "vgg16", // 选择的模型
+            selectPectureNum: 10, // 选择的图片数量
         };
     },
     methods: {
@@ -84,10 +94,10 @@ export default {
             }, 3000); // 3秒后清除消息提示
         },
         handleTitleClick(title) {
-      console.log('接收到的 title:', title);
-      this.selectModel = title; // 更新选择的模型
-      this.setMessage(`已选择模型: ${title}`, "success");
-    },
+            console.log('接收到的 title:', title);
+            this.selectModel = title; // 更新选择的模型
+            this.setMessage(`已选择模型: ${title}`, "success");
+        },
         onFileChange(e) {
             const file = e.target.files[0];
             if (file) {
@@ -113,6 +123,7 @@ export default {
             formData.append("image", this.imageFile);
             formData.append("selectWeb", this.selectWeb); // 将选择的网页类型添加到 FormData 中
             formData.append("selectModel", this.selectModel); // 将选择的模型添加到 FormData 中
+            formData.append("selectPectureNum", this.selectPectureNum); // 将选择的图片数量添加到 FormData 中
             try {
                 const res = await axios.post("http://localhost:19198/match", formData, {
                     headers: {
@@ -202,6 +213,7 @@ export default {
     flex-direction: column;
     align-items: center;
     min-height: calc(100vh - 140px);
+    position: relative;
 }
 
 .upload-section {
@@ -282,6 +294,7 @@ input[type="file"] {
     height: 200px;
     /* 设置底部空白区域的高度 */
 }
+
 .message-box {
     position: fixed;
     top: 0;
@@ -313,5 +326,36 @@ input[type="file"] {
     background-color: #fff3cd;
     color: #856404;
     border: 1px solid #ffeeba;
+}
+
+.imgslide-wrapper {
+    position: absolute;
+    top: 750px;
+    /* ✅ 这个数值你根据视觉位置微调 */
+    left: 40px;
+    width: 600px;
+    /* 控制组件最大宽度 */
+    z-index: 10;
+}
+.dual-box-wrapper {
+    display: flex;
+    width: 30%;
+    justify-content: space-between; /* 让两边分开 */
+    align-items: center; /* 垂直居中矮的盒子 */
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.left-box {
+    flex: 0 0 10%; /* 固定宽度可调 */
+    display: flex;
+    justify-content: flex-end;
+}
+
+.right-box {
+    flex: 0 0 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 </style>
