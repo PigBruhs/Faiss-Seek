@@ -3,13 +3,11 @@ from flask_cors import CORS
 import sys
 import os
 import sqlite3
-import faiss
+import hashlib
 from flask import send_from_directory
 from authService import auth
 from tokenService import tokenService
-from werkzeug.utils import secure_filename
-from typing import Dict
-import json
+
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -182,7 +180,7 @@ def match():
             return jsonify({
                 "success": True,
                 "message": result["message"],
-                "results":result["result"],
+                "results": imgservice.decoder_ring(result["result"]),
             }), 200
         else:
             return jsonify({
@@ -322,7 +320,7 @@ def approveWeb():
         result=webListService.approve(data)
         print("获取的结果是：",result)
         if result['success']:
-            imgservice.reconstruct_index_base(name=data['name'], path_or_url=data['url'], max_imgs=128)
+            imgservice.reconstruct_index_base(name=data['name'], path_or_url=data['url'], max_imgs=1024)
             return jsonify({
             "success": result["success"],
             "message": result['message']

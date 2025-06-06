@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.index_base import build_index_base
 from utils.index_search import searcher
 from utils.feature_extraction import feature_extractor
-from utils.crawler import crawl_page,save_image
+from utils.crawler import crawler
 from flask import Flask, request, jsonify
 from tqdm import tqdm
 
@@ -20,24 +20,25 @@ class ImageService:
         self.fe = feature_extractor()
         self.searcher = searcher()
         self.task_queue = queue.Queue()
+        self.url_to_filename_map = {}
 
     def download_images(self, url, name, max_imgs=128):
         base_image_folder = Path(f"../crawled_images/{name}")  # 注意拼写是crawled_images
         base_image_folder.mkdir(parents=True, exist_ok=True)
+        crawl = crawler(url,name,max_imgs)
+        crawl.crawl_page()
 
         total_batches = (max_imgs + 127) // 128
         for batch_num in tqdm(range(total_batches)):
-            batch_folder = base_image_folder / f"batch_{batch_num}"
-            batch_folder.mkdir(parents=True, exist_ok=True)
-
-            temp_urls = crawl_page(url, min(128, max_imgs - batch_num * 128))
-            save_image(temp_urls, str(batch_folder))
+            crawl.save_image()
+            self.url_to_filename_map=crawl.decoder()
 
             # 通知索引线程处理新批次
             self.task_queue.put(batch_num)
+            self.task_queue.put(None)
 
-        # 下载完成后发送终止信号
-        self.task_queue.put(None)
+
+
 
     def index_images(self, name):
         base_image_folder = Path(f"../crawled_images/{name}")  # 修正拼写：crawled_images
@@ -155,7 +156,13 @@ class ImageService:
         "success": True,
         "message": "图片匹配成功",
         "result": results
-        }   
+        }
+    def decoder_ring(self,results):
+        res = []
+        for name,score in results:
+            filename = self.url_to_filename_map.get(name)
+            res.append((filename,score))
+        return res
 
 
 
@@ -163,11 +170,10 @@ if __name__ == "__main__":
     service = ImageService()
 
     # 测试索引重建
-    """
-    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com/en/query?q=nature", max_imgs=128)
+
+    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=384)
     print(result)
-    
-    """
+
 
     # 测试图片搜索
     from PIL import Image
