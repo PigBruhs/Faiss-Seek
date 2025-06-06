@@ -1,7 +1,7 @@
 <template>
     <div class="fixed-left-btn-container">
     <div class="custom-vertical-btn" @click="handleClick">
-        <span class="vertical-text"v-if="role==='user'">填写可选图源</span>
+        <span class="vertical-text"v-if="role==='user'">选择匹配网页</span>
         <span class="vertical-text" v-else>审核图源请求</span>
         </div>
         </div>
@@ -36,18 +36,6 @@
                     <a-button type="primary" @click="approveWeb(web)">审核通过</a-button>
                     <a-button type="danger" @click="rejectWeb(web)">拒绝</a-button>
                 </div>
-            </div>
-             <div class="form-item">
-                <label>网站名字：</label>
-                <a-input v-model="webName" placeholder="请输入网站名字" />
-            </div>
-            <div class="form-item">
-                <label>网址：</label>
-                <a-input v-model="webUrl" placeholder="请输入网址" />
-            </div>
-            <div class="form-item">
-                <label>其他信息：</label>
-                <a-textarea v-model="webInfo" :max-length="400" placeholder="请输入不超过400字的信息" />
             </div>
         </div>
     </a-drawer>
@@ -85,11 +73,7 @@ export default {
                 submitWebInfo(); // 如果是 user，提交网站信息
             } else if (role === "user") {
                 props.setMessage("请填写完整的网站信息！", "warning");
-            } else if (role === "admin"&& webName.value && webUrl.value) {
-                submitWebInfo();
-                approveWeb({ name: webName.value, url: webUrl.value, info: webInfo.value }); // 提交网站信息并审核通过
-            }
-            else if(role==="admin"){
+            } else if (role === "admin") {
                 fetchWebRequestList(); // 如果是 admin，重新获取请求列表
             }
         };
