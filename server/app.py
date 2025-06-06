@@ -34,21 +34,6 @@ imgservice= ImageService()
 def serve_image(filename):
     return send_from_directory('../data/base', filename)
 
-def load_index_base(index_folder: str) -> Dict[str, faiss.IndexFlatIP]:
-    """
-    扫描 index_folder 下所有 .index 文件，加载为 Faiss 索引，并以文件名(不含扩展)为 key 返回。
-    输入：
-        index_folder: 索引文件夹路径
-    返回：
-        Dict[str, faiss.IndexFlatIP], 文件名到索引的字典
-    """
-    indices: Dict[str, faiss.IndexFlatIP] = {}
-    for file in os.listdir(index_folder):
-        if file.lower().endswith(".index"):
-            name, _ = os.path.splitext(file)
-            path = os.path.join(index_folder, file)
-            indices[name] = faiss.read_index(path)
-    return indices
 
 def init_db(): #使用数据库建模文件初始化数据库，在命令行中使用一次即可。
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'database.db')
@@ -173,106 +158,45 @@ def match():
             "success": False,
             "message": "未接收到文件"
         }), 400
-    result= imgservice.img_search(file, model="vgg16", top_n=5)  # 调用图片搜索服务
-    if not result["success"]:
+    select_web = request.form.get('selectWeb')  # 获取选择的网站类型
+    if not select_web:
         return jsonify({
             "success": False,
-            "message": result["message"],
-        }), 401
-    elif result.get("result"):
-        return jsonify({
-            "success": True,
-            "message": result["message"],
-            "results":result["result"],
-        }), 200
-    else:
-        return jsonify({
-            "success": False,
-            "message": result["message"],
+            "message": "未选择匹配的网页类型"
         }), 400
+    try:
+        if select_web=="答而多图图":
+            print("选择了本地图片匹配")
+            result= imgservice.img_search(file, model="vgg16", top_n=5,mode="local")  # 调用图片搜索服务
+            print("图片匹配结果类型:", type(result))
+            print("匹配结果内容:", result)
+        else:
+            print("选择了网络图片匹配", select_web)
+            result= imgservice.img_search(file, model="vgg16", top_n=5,mode="url", name=select_web)  # 调用图片搜索服务
+        if not result["success"]:
+            return jsonify({
+                "success": False,
+                "message": result["message"],
+            }), 401
+        elif result.get("result"):
+            return jsonify({
+                "success": True,
+                "message": result["message"],
+                "results":result["result"],
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "message": result["message"],
+            }), 400
+    except Exception as e:
+        print("图片匹配失败:", e)
+        return jsonify({
+            "success": False,
+            "message": "图片匹配失败，服务器错误：" + str(e),
+        }), 500
 
     #
-'''
-@app.route('/match', methods=['POST'])
-def match():
-    # 检查 Authorization 请求头
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return jsonify({
-            "success": False,
-            "message": "缺少或无效的 Token"
-        }), 401
-
-    token = auth_header.split(" ")[1]  # 提取 Token
-    # 验证 Token
-    db = cnnect_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM users WHERE token = ?", (token,))
-    user = cursor.fetchone()
-    db.close()
-
-    if not user:
-        return jsonify({
-            "success": False,
-            "message": "Token 无效或已过期"
-        }), 401
-
-    # 获取上传的图片
-    file = request.files.get('image')
-    if not file:
-        return jsonify({
-            "success": False,
-            "message": "未接收到文件"
-        }), 400
-
-    # 确保文件名包含扩展名
-    filename = secure_filename(file.filename)
-    if '.' not in filename:
-        filename += '.jpg'  # 默认添加 .jpg 扩展名
-
-    # 保存图片到临时目录
-    temp_dir = '../data/temp'
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
-    file_path = os.path.join(temp_dir, filename)
-    file.save(file_path)
-
-    # 检查文件是否保存成功
-    if not os.path.exists(file_path):
-        return jsonify({
-            "success": False,
-            "message": "文件保存失败"
-        }), 500
-
-    # 加载索引并进行匹配
-    try:
-        indices = load_index_base('../index_base/local')  # 加载索引
-        topn = search_topn(indices, image_path=file_path, top_n=5)  # 获取匹配结果
-    except Exception as e:
-        # 删除临时文件
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        return jsonify({
-            "success": False,
-            "message": f"匹配失败: {str(e)}"
-        }), 500
-
-    # 删除临时文件
-    if os.path.exists(file_path):
-        os.remove(file_path)
-
-    # 构造返回的图片 URL
-    base_url = request.host_url + "data/base/"
-    results = [{"name": name, "url": base_url + name + ".jpg", "score": score} for name, score in topn]
-
-    # 返回匹配结果
-    return jsonify({
-        "success": True,
-        "message": "图片接受成功",
-        "results": results  # 返回匹配结果
-    }), 200
-        '''
-
 
 @app.route('/getWebList', methods=['POST'])
 def getWebList():
