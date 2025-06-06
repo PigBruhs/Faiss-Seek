@@ -1,18 +1,18 @@
 <template>
     <div class="fixed-right-btn-container">
     <div class="custom-vertical-btn" @click="handleClick">
-        <span class="vertical-text">选择匹配网页</span>
+        <span class="vertical-text">选择搜索图源</span>
         </div>
      </div>
     <a-drawer :width="340" :visible="visible" @ok="handleOk" @cancel="handleCancel" unmountOnClose>
         <template #title>
-            <span>选择匹配网页</span>
+            <span>选择搜索图源</span>
         </template>
         <div class="web-list">
             <div v-for="web in webList" :key="web.id" class="web-item">
                 <label>
                     <input type="radio" :value="web.name" v-model="selectedWeb" />
-                    {{ web.name }}网站类型{{ web.type }}
+                    图源： {{ web.name }}    图源类型： {{ web.type }}
                 </label>
             </div>
         </div>

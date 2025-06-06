@@ -8,23 +8,27 @@
             <SelectWeb :onSelectWeb="handleWebSelection" :setMessage="setMessage"/>
             <AddWeb :setMessage="setMessage"/>
             <div class="upload-section">
+                <section-divider text="选择搜索模型" />
+                <PopBottom @onTitleClick="handleTitleClick"/>
+                <section-divider text="上传图片进行搜索" />
                 <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
                 <div v-if="imageUrl" class="preview">
                     <img :src="imageUrl" alt="预览" class="preview-img" />
                     <button @click="removeImage">删除图片</button>
                 </div>
                 <div v-if="!isMatching">
-                    <button :disabled="!imageUrl" @click="startMatching">匹配</button>
+                    <button :disabled="!imageUrl" @click="startMatching">开始搜索</button>
                 </div>
                 <div v-else>
-                    <img :src="matchingImageUrl" alt="匹配中" class="matching-img" />
+                    <img :src="matchingImageUrl" alt="搜索中" class="matching-img" />
                 </div>
             </div>
+            <section-divider text="搜索结果" />
             <div class="image-gallery" v-if="imageList.length > 0">
-                <h3>匹配结果：</h3>
+                <h3>搜索结果：</h3>
                 <div class="image-grid">
                     <ImageDiv v-for="(image, index) in imageList" :key="index" :imageSrc1="image.url"
-                        :imageTitle="image.name" :imageDescription="'匹配分数: ' + image.score.toFixed(2)"
+                        :imageTitle="image.name" :imageDescription="'相似度: ' + image.score.toFixed(2)"
                         :tooltipContent="'图片名称: ' + image.name" />
                 </div>
             </div>
@@ -35,6 +39,8 @@
 </template>
 
 <script>
+import SectionDivider from "./scomponents/SectionDivider.vue";
+import PopBottom from "./scomponents/PopBottom.vue";
 import AddWeb from "./scomponents/AddWeb.vue";
 import ImageDiv from "./scomponents/ImageDiv.vue";
 import HeaderTopAfterLogin from "./scomponents/HeaderTopAfterLogin.vue";
@@ -42,18 +48,19 @@ import axios from "axios";
 import SelectWeb from "./scomponents/SelectWeb.vue";
 
 export default {
-    components: { ImageDiv, HeaderTopAfterLogin, SelectWeb ,AddWeb},
+    components: { ImageDiv, HeaderTopAfterLogin, SelectWeb ,AddWeb, PopBottom, SectionDivider },
     data() {
         return {
             imageFile: null, // 存储上传的图片文件
             imageUrl: null, // 存储图片预览的 URL
-            imageList: [], // 存储后端返回的匹配结果
-            isMatching: false, // 是否正在匹配
-            matchingImageUrl: "", // 匹配中显示的图片 URL
+            imageList: [], // 存储后端返回的搜索结果
+            isMatching: false, // 是否正在搜索
+            matchingImageUrl: "", // 搜索中显示的图片 URL
             message: "",
             messageType: "",
             userId: "", // 用户 ID
             selectWeb: "", // 选择的网页
+            selectModel: "vgg16", // 选择的模型
         };
     },
     methods: {
@@ -76,30 +83,36 @@ export default {
                 this.messageType = "";
             }, 3000); // 3秒后清除消息提示
         },
+        handleTitleClick(title) {
+      console.log('接收到的 title:', title);
+      this.selectModel = title; // 更新选择的模型
+      this.setMessage(`已选择模型: ${title}`, "success");
+    },
         onFileChange(e) {
             const file = e.target.files[0];
             if (file) {
                 this.imageFile = file;
                 this.imageUrl = URL.createObjectURL(file);
-                this.isMatching = false; // 上传新图片时重置匹配状态
+                this.isMatching = false; // 上传新图片时重置搜索状态
             }
         },
         removeImage() {
             this.imageFile = null;
             this.imageUrl = null;
-            this.isMatching = false; // 删除图片时重置匹配状态
+            this.isMatching = false; // 删除图片时重置搜索状态
             this.$refs.fileInput.value = "";
         },
         async startMatching() {
             if (!this.imageFile) return;
 
-            // 设置匹配状态为 true，显示占位图片
+            // 设置搜索状态为 true，显示占位图片
             this.isMatching = true;
-            this.matchingImageUrl = "/src/assets/images/search.gif"; // 设置匹配中占位图片
+            this.matchingImageUrl = "/src/assets/images/search.gif"; // 设置搜索中占位图片
 
             const formData = new FormData();
             formData.append("image", this.imageFile);
             formData.append("selectWeb", this.selectWeb); // 将选择的网页类型添加到 FormData 中
+            formData.append("selectModel", this.selectModel); // 将选择的模型添加到 FormData 中
             try {
                 const res = await axios.post("http://localhost:19198/match", formData, {
                     headers: {
@@ -110,21 +123,21 @@ export default {
 
                 if (res.data.success) {
                     this.imageList = res.data.results;
-                    this.setMessage("匹配成功", "success");
-                    console.log("匹配结果:", this.imageList);
-                    this.matchingImageUrl = "/src/assets/images/searchfinished.gif"; // 设置匹配完成的图片
+                    this.setMessage("搜索成功", "success");
+                    console.log("搜索结果:", this.imageList);
+                    this.matchingImageUrl = "/src/assets/images/searchfinished.gif"; // 设置搜索完成的图片
                 } else {
-                    this.setMessage(res.data.message || "匹配失败", "error");
+                    this.setMessage(res.data.message || "搜索失败", "error");
                     this.resetMatching();
                 }
             } catch (err) {
-                console.error("匹配失败:", err);
-                this.setMessage("匹配失败，请稍后重试", "error");
+                console.error("搜索失败:", err);
+                this.setMessage("搜索失败，请稍后重试", "error");
                 this.resetMatching();
             }
         },
         resetMatching() {
-            // 恢复匹配按钮
+            // 恢复搜索按钮
             this.isMatching = false;
             this.matchingImageUrl = "";
         },
