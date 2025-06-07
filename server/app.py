@@ -320,7 +320,77 @@ def approveWeb():
         result=webListService.approve(data)
         print("获取的结果是：",result)
         if result['success']:
-            imgservice.reconstruct_index_base(name=data['name'], path_or_url=data['url'], max_imgs=1024)
+            return jsonify({
+            "success": result["success"],
+            "message": result['message']
+        }), 200
+        else:
+            return jsonify({
+            "success": result["success"],
+            "message": result['message']
+        }), 400
+
+@app.route('/rejectWeb', methods=['POST'])
+def rejectWeb():
+    auth_header = request.headers.get('Authorization')
+    print("Authorization:", auth_header)
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({
+            "success": False,
+            "message": "缺少或无效的 Token"
+        }), 401
+
+    token = auth_header.split(" ")[1]  # 提取 Token
+    # 验证 Token（示例代码，实际需要根据你的逻辑验证 Token）
+    tokenResult=tokenService.isAdmin(token)
+    if not tokenResult:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+    else:
+        # 如果 Token 验证成功
+        data=request.get_json()
+        print("获取到的数据：",data)
+        result=webListService.reject(data)
+        print("获取的结果是：",result)
+        if result['success']:
+            return jsonify({
+            "success": result["success"],
+            "message": result['message']
+        }), 200
+        else:
+            return jsonify({
+            "success": result["success"],
+            "message": result['message']
+        }), 400
+
+
+@app.route('/deleteWeb', methods=['POST'])
+def deletetWeb():
+    auth_header = request.headers.get('Authorization')
+    print("Authorization:", auth_header)
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({
+            "success": False,
+            "message": "缺少或无效的 Token"
+        }), 401
+
+    token = auth_header.split(" ")[1]  # 提取 Token
+    # 验证 Token（示例代码，实际需要根据你的逻辑验证 Token）
+    tokenResult=tokenService.isAdmin(token)
+    if not tokenResult:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+    else:
+        # 如果 Token 验证成功
+        data=request.get_json()
+        print("获取到的数据：",data)
+        result=webListService.delete(data)
+        print("获取的结果是：",result)
+        if result['success']:
             return jsonify({
             "success": result["success"],
             "message": result['message']

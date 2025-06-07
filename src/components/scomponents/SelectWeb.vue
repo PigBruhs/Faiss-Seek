@@ -152,7 +152,7 @@ export default {
                     "http://localhost:19198/deleteWeb",
                     {
                         name: currentDeleteWeb.name,
-                        url: currentDeleteWeb.url,
+                        id: currentDeleteWeb.id,
                     },
                     {
                         headers: {
