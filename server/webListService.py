@@ -6,6 +6,8 @@ from dbService import cnnect_db
 import sqlite3
 import bcrypt
 from register import record_exists
+from imageService import ImageService
+imgservice= ImageService()
 class WebListService:
     def getWebList(self):
         return GetWbebList()
@@ -15,7 +17,10 @@ class WebListService:
         return WebRequestList()
     def approve(self,data):
         return ApproveWeb(data)
-       
+    def reject(self,data):
+        return Reject(data)
+    def delete(self,data):
+        return Delete(data)
 
 
 
@@ -32,7 +37,9 @@ def GetWbebList():
         type TEXT ,
         URL  TEXT NOT NULL,
         info TEXT NOT NULL,
-        is_approved INTEGER DEFAULT 0
+        is_approved INTEGER DEFAULT 0,
+        is_create_index INTEGER DEFAULT 0,
+        index_count INTEGER DEFAULT 0
         )
         '''
     )
@@ -137,11 +144,17 @@ def ApproveWeb(data):
     print("获取到的要更改的词条的数据:",data)
     db=cnnect_db()
     cursor=db.cursor()
+    #建立索引
+    result2=imgservice.reconstruct_index_base(name=data['name'],path_or_url=data['url'],max_imgs=30)
+    print("建立索引的结果是：",result2)
+    if not result2['success']:#如果建立索引失败
+            db.close()
+            return result2
     #修改数据
     cursor.execute(
         '''
-        UPDATE webs set is_approved=?,type=? where url=?
-        ''',(1,data['type'],data['url'])
+        UPDATE webs set is_approved=?,type=?,is_create_index=?,index_count=? where url=?
+        ''',(1,data['type'],1,result2['index_count'],data['url'])
     )
     #查询数据是否修改成功
     cursor.execute(
@@ -155,10 +168,76 @@ def ApproveWeb(data):
         result={'success':True,'message':"审核通过"}
         db.commit()
         db.close()
+        #接下来建立索引库
         return result
     else:
         result={'success':False,'message':"数据修改失败"}
         db.close()
         return result
-    
 
+
+def Reject(data):
+    #查看获取到的数据
+    print("获取到的要更改的词条的数据:",data)
+    db=cnnect_db()
+    cursor=db.cursor()
+    #修改数据
+    cursor.execute(
+        '''
+        DELETE FROM webs WHERE is_approved=? AND URL=?
+        ''',(0,data['url'])
+    )
+    #查询数据是否修改成功
+    cursor.execute(
+        '''
+        SELECT *  FROM webs where url=? AND is_approved=?
+        ''',(data['url'],0)
+    )
+    data2=cursor.fetchone()
+    print("在数据库中查找是否修改成功，结果是：",data2)
+    if not data2:#修改成功时，查找返回的是空数据
+        result={'success':True,'message':"拒绝请求成功"}
+        db.commit()
+        db.close()
+        #拒绝则无需建立索引库
+        return result
+    else:
+        result={'success':False,'message':"数据修改失败"}
+        db.close()
+        return result
+
+
+
+def Delete(data):
+     #查看获取到的数据
+    print("获取到的要更改的词条的数据:",data)
+    db=cnnect_db()
+    cursor=db.cursor()
+    #修改数据
+    cursor.execute(
+        '''
+        DELETE FROM webs WHERE is_approved=? AND id=? AND name=?
+        ''',(1,data['id'],data['name'])
+    )
+    #查询数据是否修改成功
+    cursor.execute(
+        '''
+        SELECT *  FROM webs where id=? AND is_approved=? AND name=?
+        ''',(data['id'],1,data['name'])
+    )
+    data2=cursor.fetchone()
+    print("在数据库中查找是否修改成功，结果是：",data2)
+    if not data2:#修改成功时，查找返回的是空数据
+        result={'success':True,'message':"图源删除成功"}
+        result2=imgservice.destroy_index_base(name=data['name'])
+        if not result2['success']:#删除失败则返回相应的信息
+            db.close()
+            return result2
+        db.commit()
+        db.close()
+        #删除需删除对应索引库索引库
+        return result
+    else:
+        result={'success':False,'message':"删除失败，图源不存在或权限不足"}
+        db.close()
+        return result
