@@ -41,6 +41,7 @@ class crawler:
         self.url_to_filename_map = {}
         self.max_images = max_images
         self.current_batch=0
+        os.makedirs(f"../crawled_images/{self.name}",exist_ok=True)  # 确保目录存在
 
     def generate_filename_from_url(self,url):
         """通过URL生成唯一的文件名"""
@@ -74,7 +75,7 @@ class crawler:
                     if src:
                         # 处理相对URL
                         img_url = urljoin(current_url, src)
-                        if img_url.startswith('http') or img_url.startswith('https'):
+                        if (img_url.startswith('http') or img_url.startswith('https')) and "logo" not in img_url:
                             self.image_urls.add(img_url)
                             print(f"[{len(self.image_urls)}/{self.max_images}] 发现图片: {img_url}")
                         if len(self.image_urls) >= self.max_images:
@@ -94,15 +95,16 @@ class crawler:
         下载图片到指定文件夹，并以哈希值命名。
         每次下载128张后结束，支持断点续传。
         """
-        target_folder = f"crawled_images/{self.name}/batch{self.current_batch}"
-        os.makedirs(target_folder, exist_ok=True)
 
+        target_folder = f"../crawled_images/{self.name}/batch{self.current_batch}"
+        os.makedirs(target_folder,exist_ok=True)  # 确保目录存在
         # 记录已下载的图片数量
         downloaded_count = len(os.listdir(target_folder)) if os.path.exists(target_folder) else 0
 
         for idx, url in enumerate(list(self.image_urls)[downloaded_count:], 1):
-            if downloaded_count >= 128:  # 每次下载128张后结束
-                print(f"已下载128张图片，暂停下载。")
+            if downloaded_count >= 128 or downloaded_count >= self.max_images:  # 每次下载128张后结束
+                print(f"暂停下载")
+                self.current_batch += 1
                 break
 
             try:
@@ -122,9 +124,6 @@ class crawler:
             except Exception as e:
                 print(f"错误下载: {url} -> {e}")
 
-        if downloaded_count >= 128:
-            self.current_batch += 1
-
 
 
 
@@ -133,14 +132,13 @@ class crawler:
 if __name__ == "__main__":
     url = "https://www.hippopx.com"  # 替换为你要爬取的目标网站
     name = "example_crawl"
-    crawler_instance = crawler(url, name, max_images=1024)
+    crawler_instance = crawler(url, name, max_images=8)
 
     # 爬取页面
     crawler_instance.crawl_page()
-    for i in range(8):
 
-        crawler_instance.save_image()
+    crawler_instance.save_image()
 
     print(f"爬取完成，共下载 {len(crawler_instance.image_urls)} 张图片。")
 
-    print(crawler_instance.decode_filename_to_url("46ff21f4d039943532a3efacfbb32250"))
+    print(crawler_instance.url_to_filename_map.get("7e69c83febde6ce0174d2ba162cc3b23"))

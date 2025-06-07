@@ -30,12 +30,14 @@ class ImageService:
 
         total_batches = (max_imgs + 127) // 128
         for batch_num in tqdm(range(total_batches)):
+
             crawl.save_image()
             self.url_to_filename_map=crawl.decoder()
 
             # 通知索引线程处理新批次
-            self.task_queue.put(batch_num)
-            self.task_queue.put(None)
+            self.task_queue.put(crawl.current_batch)
+
+        self.task_queue.put(None)
 
 
 
@@ -51,7 +53,7 @@ class ImageService:
                 self.task_queue.task_done()
                 break
 
-            batch_folder = base_image_folder / f"batch_{batch_num}"
+            batch_folder = base_image_folder / f"batch{batch_num}"
             index_folder = Path(f"../index_base/url/{name}")
             index_folder.mkdir(parents=True, exist_ok=True)
 
@@ -63,7 +65,7 @@ class ImageService:
                     model=model
                 )
 
-            shutil.rmtree(batch_folder)
+            #shutil.rmtree(batch_folder)
             self.task_queue.task_done()
 
     def reconstruct_index_base(self, name=None,path_or_url=None, max_imgs=32767):
@@ -82,7 +84,7 @@ class ImageService:
                 # 先启动下载线程
                 download_thread.start()
                 # 稍等确保下载线程先运行
-                threading.Event().wait(0.1)
+                threading.Event().wait(5)
                 # 再启动索引线程
                 index_thread.start()
 
@@ -199,7 +201,7 @@ if __name__ == "__main__":
 
     # 测试索引重建
 
-    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=384)
+    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=8)
     print(result)
 
 
@@ -207,7 +209,7 @@ if __name__ == "__main__":
     from PIL import Image
     test_image = Image.open("../data/search/002_anchor_image_0001.jpg")
     search_result = service.img_search(test_image, model="vgg16", top_n=5, mode="url", name="test_index")
-    print(search_result)
+    print(service.decoder_ring(search_result))
 
 
 
