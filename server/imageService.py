@@ -65,7 +65,7 @@ class ImageService:
                     model=model
                 )
 
-            #shutil.rmtree(batch_folder)
+            shutil.rmtree(batch_folder)
             self.task_queue.task_done()
 
     def reconstruct_index_base(self, name=None,path_or_url=None, max_imgs=32767):
@@ -201,7 +201,7 @@ if __name__ == "__main__":
 
     # 测试索引重建
 
-    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=8)
+    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=256)
     print(result)
 
 
