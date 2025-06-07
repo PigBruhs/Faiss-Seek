@@ -113,10 +113,23 @@ class ImageService:
                         model=model
                     )
 
-            return {"success": True, "message": f"{name} 索引库重建成功"}
+                model_folders = [index_folder / model for model in ["resnet50", "vgg16", "vit16"]]
+                index_counts = [len(list(folder.glob("*.index"))) for folder in model_folders if folder.exists()]
+
+                if len(set(index_counts)) == 1:  # 检查数量是否一致
+                    index_count = index_counts[0]
+                else:
+                    raise ValueError("三个模型文件夹下的索引数量不一致")
+
+                return {
+                    "success": True,
+                    "message": f"{name} 索引库重建成功",
+                    "index_count": index_count
+                }
+
         except Exception as e:
             print(f"索引库重建失败: {e}")
-            return {"success": False, "message": f"{name} 索引库重建失败"}
+            return {"success": False, "message": f"{name} 索引库重建失败", "index_count": -1}
 
     def destroy_index_base(self,name=None):
         try:
@@ -185,4 +198,4 @@ if __name__ == "__main__":
 
 
 
-        
+
