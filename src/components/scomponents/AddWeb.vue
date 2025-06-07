@@ -1,5 +1,10 @@
 <template>
-    <a-button type="primary" @click="handleClick">上传图源信息</a-button>
+    <div class="fixed-left-btn-container">
+    <div class="custom-vertical-btn" @click="handleClick">
+        <span class="vertical-text"v-if="role==='user'">填写可选图源</span>
+        <span class="vertical-text" v-else>审核图源请求</span>
+        </div>
+        </div>
     <a-drawer :width="500" :visible="visible" @ok="handleOk" @cancel="handleCancel" :placement="position"
         unmountOnClose>
         <template #title>
@@ -32,6 +37,18 @@
                     <a-button type="danger" @click="rejectWeb(web)">拒绝</a-button>
                 </div>
             </div>
+             <div class="form-item">
+                <label>网站名字：</label>
+                <a-input v-model="webName" placeholder="请输入网站名字" />
+            </div>
+            <div class="form-item">
+                <label>网址：</label>
+                <a-input v-model="webUrl" placeholder="请输入网址" />
+            </div>
+            <div class="form-item">
+                <label>其他信息：</label>
+                <a-textarea v-model="webInfo" :max-length="400" placeholder="请输入不超过400字的信息" />
+            </div>
         </div>
     </a-drawer>
 </template>
@@ -41,10 +58,6 @@ import axios from "axios";
 
 export default {
     props: {
-        addWebRequest: {
-            type: Function,
-            required: true, // 父组件传递回调函数
-        },
         setMessage: {
             type: Function,
             required: true, // 父组件传递回调函数
@@ -69,8 +82,14 @@ export default {
         const handleOk = () => {
             visible.value = false;
             if (role == "user" && webName.value && webUrl.value) {
-                props.addWebRequest(webName.value, webUrl.value, webInfo.value); // 调用父组件传递的回调函数
-            } else if (role === "admin") {
+                submitWebInfo(); // 如果是 user，提交网站信息
+            } else if (role === "user") {
+                props.setMessage("请填写完整的网站信息！", "warning");
+            } else if (role === "admin"&& webName.value && webUrl.value) {
+                submitWebInfo();
+                approveWeb({ name: webName.value, url: webUrl.value, info: webInfo.value }); // 提交网站信息并审核通过
+            }
+            else if(role==="admin"){
                 fetchWebRequestList(); // 如果是 admin，重新获取请求列表
             }
         };
@@ -87,6 +106,7 @@ export default {
                     info: webInfo.value,
                 }, {
                     headers: {
+                        "Content-Type": "application/json", // 必须加上这行
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
@@ -128,12 +148,14 @@ export default {
                 return;
             }
             try {
+                console.log(web.name)
                 const response = await axios.post("http://localhost:19198/approveWeb", {
                     name: web.name,
                     url: web.url,
                     type: siteType,
                     },{
                     headers: {
+                        "Content-Type": "application/json", // 必须加上这行
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
@@ -155,6 +177,7 @@ export default {
                     name: web.name,
                     url: web.url,},{
                     headers: {
+                        "Content-Type": "application/json", // 必须加上这行
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                     },
                 });
@@ -209,5 +232,42 @@ export default {
     display: flex;
     gap: 10px;
     margin-top: 10px;
+}
+.fixed-left-btn-container {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+  /* 给容器一个固定宽度，保证按钮能完整展示 */
+  width: 60px;
+}
+/* 自定义一个“看起来像按钮”的 div */
+.custom-vertical-btn {
+  background-color: #1890ff;    /* Antd primary 颜色 */
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* 下面宽高根据文字多少调整，确保文字不会溢出 */
+  width: 30px;
+  height: 120px;
+  transition: background-color 0.2s;
+}
+.custom-vertical-btn:hover {
+  background-color: #40a9ff;
+}
+/* 竖排文字 */
+.vertical-text {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  color: white;
+  font-size: 14px;
+  line-height: 1.4;
+  user-select: none;
 }
 </style>
