@@ -157,6 +157,8 @@ def match():
             "message": "未接收到文件"
         }), 400
     select_web = request.form.get('selectWeb')  # 获取选择的网站类型
+    select_mode=request.form.get('selectModel')#获取选择的模型类型
+    print("选择的模型是：",select_mode)
     if not select_web:
         return jsonify({
             "success": False,
@@ -165,12 +167,13 @@ def match():
     try:
         if select_web=="答而多图图":
             print("选择了本地图片匹配")
-            result= imgservice.img_search(file, model="vgg16", top_n=5,mode="local")  # 调用图片搜索服务
+            result= imgservice.img_search(file, model=select_mode, top_n=5,mode="local")  # 调用图片搜索服务
             print("图片匹配结果类型:", type(result))
             print("匹配结果内容:", result)
         else:
             print("选择了网络图片匹配", select_web)
-            result= imgservice.img_search(file, model="vgg16", top_n=5,mode="url", name=select_web)  # 调用图片搜索服务
+            result= imgservice.img_search(file, model=select_mode, top_n=5,mode="url", name=select_web)  # 调用图片搜索服务
+            print("图片搜索的结果：",result)
         if not result["success"]:
             return jsonify({
                 "success": False,
