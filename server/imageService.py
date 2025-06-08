@@ -32,7 +32,8 @@ class ImageService:
         for batch_num in tqdm(range(total_batches)):
 
             crawl.save_image()
-            self.url_to_filename_map=crawl.decoder()
+            self.url_to_filename_map = crawl.decoder()
+            print("URL 到文件名映射:", self.url_to_filename_map)
 
             # 通知索引线程处理新批次
             self.task_queue.put(crawl.current_batch)
@@ -171,27 +172,63 @@ class ImageService:
             return {"success": False, "message": f"{name} 索引库删除失败"}
 
 
-    def img_search(self,img,model="vgg16",top_n=5,mode="local",name=None):
+    def img_search(self, img, model="vgg16", top_n=5, mode="local", name=None):
         try:
+            # 检查文件流
+            if not img or not hasattr(img, 'stream'):
+                return {
+                    "success": False,
+                    "message": "未接收到有效的图片文件"
+                }
+
+            # 打开图片并转换为 RGB
             img = Image.open(img.stream).convert('RGB')
-            topn = searcher.search_topn(image = img, model=model, top_n=top_n, fe=self.fe,mode=mode, name=name)
+
+            # 调用搜索服务
+            topn = searcher.search_topn(image=img, model=model, top_n=top_n, fe=self.fe, mode=mode, name=name)
+
+            # 检查返回结果格式
+            if not isinstance(topn, list):
+                return {
+                    "success": False,
+                    "message": "图片匹配失败，返回结果格式不正确"
+                }
+
+            # 生成结果列表
+            results = []
+            for item in topn:
+                if isinstance(item, tuple) and len(item) == 2:
+                    name, score = item
+                    results.append({"name": name, "score": score})
+                else:
+                    print(f"跳过无效的匹配结果: {item}")
+
+            return {
+                "success": True,
+                "message": "图片匹配成功",
+                "result": results
+            }
         except Exception as e:
-            print("图片匹配失败")
-            result = {"success": False, "message": f"图片匹配失败，{e}"}
-            return result
+            print(f"图片匹配失败，错误详情: {e}")
+            return {
+                "success": False,
+                "message": f"图片匹配失败，{e}"
+            }
 
-        results = [{"name": name,"score": score} for (name,score) in topn]
-
-        return {
-        "success": True,
-        "message": "图片匹配成功",
-        "result": results
-        }
-    def decoder_ring(self,results):
+    def decoder_ring(self, results):
         res = []
-        for name,score in results:
+        print("传递给 decoder_ring 的结果:", results)  # 打印 results 的内容
+        for item in results:
+            name = item.get("name")  # 从字典中获取 name
+            score = item.get("score")  # 从字典中获取 score
+
+            # 直接使用完整文件名查找 URL
             filename = self.url_to_filename_map.get(name)
-            res.append((filename,score))
+
+            if filename is None:
+                print(f"未找到对应的文件名: {name}")
+                continue
+            res.append((filename, score))
         return res
 
 

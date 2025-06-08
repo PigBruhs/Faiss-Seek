@@ -1,5 +1,4 @@
 import os
-
 import faiss
 import numpy as np
 import sys
@@ -14,7 +13,6 @@ class searcher:
     """
     用于检索图片的类，初始化时加载索引文件夹。
     """
-
 
     def search_topn(
             image_path: str = None,
@@ -36,43 +34,64 @@ class searcher:
         返回：
           List[(名称, 相似度)]
         """
-        if mode == "local":
-            index_base = load_index_base(f"../index_base/local/{model}")
-        elif mode == "url":
-            index_base = load_index_base(f"../index_base/url/{name}/{model}")
-        else:
-            raise ValueError("Unsupported mode. Use 'local' or 'url'.")
-        query_img = fe.extract(image_path=image_path, image=image, model=model)
+        try:
+            # 加载索引库
+            if mode == "local":
+                index_path = f"../index_base/local/{model}"
+            elif mode == "url":
+                index_path = f"../index_base/url/{name}/{model}"
+            else:
+                raise ValueError("Unsupported mode. Use 'local' or 'url'.")
+            print(f"加载索引路径: {index_path}")
+            index_base = load_index_base(index_path)
 
-        query_vec = query_img.reconstruct_n(0, 1).astype(np.float32)
-        faiss.normalize_L2(query_vec)
+            if not index_base:
+                print("索引库为空，无法进行搜索")
+                return []
 
-        # 2. 合并底库所有向量并记录名称顺序
-        names, feats = [], []
-        for name, idx in index_base.items():
-            nt = idx.ntotal
-            if nt == 0:
-                continue
-            vecs = idx.reconstruct_n(0, nt).astype(np.float32)
-            faiss.normalize_L2(vecs)
-            for v in vecs:
-                names.append(name)
-                feats.append(v)
-        if not feats:
+            # 提取查询向量
+            if not image_path and not image:
+                raise ValueError("必须提供 image_path 或 image 参数")
+            query_img = fe.extract(image_path=image_path, image=image, model=model)
+            query_vec = query_img.reconstruct_n(0, 1).astype(np.float32)
+
+            if query_vec is None or query_vec.shape[0] == 0:
+                raise ValueError("查询向量为空，无法进行搜索")
+            faiss.normalize_L2(query_vec)
+
+            # 合并底库所有向量并记录名称顺序
+            names, feats = [], []
+            for name, idx in index_base.items():
+                nt = idx.ntotal
+                if nt == 0:
+                    continue
+                vecs = idx.reconstruct_n(0, nt).astype(np.float32)
+                faiss.normalize_L2(vecs)
+                for v in vecs:
+                    names.append(name)
+                    feats.append(v)
+
+            if not feats:
+                print("底库向量为空，无法进行搜索")
+                return []
+
+            features = np.stack(feats, axis=0)
+            d = features.shape[1]
+            flat = faiss.IndexFlatIP(d)
+            flat.add(features)
+
+            # 搜索并映射回名称
+            distances, indices = flat.search(query_vec, top_n)
+            results = []
+            for idx, score in zip(indices[0], distances[0]):
+                if idx < len(names):
+                    results.append((names[idx], float(score)))
+                else:
+                    print(f"跳过无效的索引: {idx}")
+            return results
+        except Exception as e:
+            print(f"搜索失败，错误详情: {e}")
             return []
-
-        features = np.stack(feats, axis=0)
-        d = features.shape[1]
-        # 3. 构建统一内积索引并添加所有向量
-        flat = faiss.IndexFlatIP(d)
-        flat.add(features)
-
-        # 4. 搜索并映射回名称
-        distances, indices = flat.search(query_vec, top_n)
-        results = []
-        for idx, score in zip(indices[0], distances[0]):
-            results.append((names[idx], float(score)))
-        return results
 
 
 """

@@ -171,6 +171,8 @@ def match():
         else:
             print("选择了网络图片匹配", select_web)
             result= imgservice.img_search(file, model="vgg16", top_n=5,mode="url", name=select_web)  # 调用图片搜索服务
+            print("图片匹配结果类型:", type(result))
+            print("匹配结果内容:", result)
         if not result["success"]:
             return jsonify({
                 "success": False,
