@@ -8,31 +8,46 @@
             <SelectWeb :onSelectWeb="handleWebSelection" :setMessage="setMessage" />
             <AddWeb :setMessage="setMessage" />
             <div class="upload-section">
-                <section-divider text="选择搜索模型" />
-                <PopBottom @onTitleClick="handleTitleClick" />
-                <section-divider text="上传图片进行搜索" />
-                <div class="dual-box-wrapper">
-                    <div class="left-box">
-                         <h3 style="margin-bottom: 10px;">选择图片数量</h3>
-                        <ImgSlide v-model="selectPectureNum" :max="100" :height="300" />
+                <div class="shangbian">
+
+                    <div class="dual-box-wrapper">
+                        <div class="left-box">
+                            <h3 class="font" style="margin-bottom: 10px;">选择模型</h3>
+                        </div>
+                        <!-- <section-divider text="选择搜索模型" /> -->
+                        <PopBottom @onTitleClick="handleTitleClick" />  
                     </div>
-                    <div class="right-box">
-                        <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
-                        <div v-if="imageUrl" class="preview">
-                            <img :src="imageUrl" alt="预览" class="preview-img" />
-                            <button @click="removeImage">删除图片</button>
+                    
+
+                    <!-- <section-divider text="上传图片进行搜索" /> -->
+                    <div class="dual-box-wrapper">
+                        <div class="left-box">
+                            <h3 class="font" style="margin: auto;">选择图片数量</h3>
+                            <ImgSlide v-model="selectPectureNum" :max="100" :height="300" />
                         </div>
-                        <div v-if="!isMatching">
-                            <button :disabled="!imageUrl" @click="startMatching">开始搜索</button>
+                        <div class="right-box">
+                            <input type="file" accept="image/*" @change="onFileChange" ref="fileInput" />
+                            <div v-if="imageUrl" class="preview">
+                                <img :src="imageUrl" alt="预览" class="preview-img" />
+                                
+                            </div>
+                            
                         </div>
-                        <div v-else>
-                            <img :src="matchingImageUrl" alt="搜索中" class="matching-img" />
+                        <div class="rightrightbox">
+                            <a-button class="font" @click="removeImage" type="primary" size="large">删除图片</a-button>
+                            <div v-if="!isMatching">
+                                <a-button class="font" :disabled="!imageUrl" @click="startMatching" type="primary" size="large">开始搜索</a-button>
+                            </div>
+                            <div v-else>
+                                <img :src="matchingImageUrl" alt="搜索中" class="matching-img" />
+                            </div>
                         </div>
                     </div>
+                    
                 </div>
-                <section-divider text="搜索结果" />
+                <section-divider class="font" text="搜索结果" />
                 <div class="image-gallery" v-if="imageList.length > 0">
-                    <h3>搜索结果：</h3>
+                    <h2 class="font">搜索结果：</h2>
                     <div class="image-grid">
                         <ImageDiv v-for="(image, index) in imageList" :key="index" :imageSrc1="image.url"
                             :imageTitle="image.name" :imageDescription="'相似度: ' + image.score.toFixed(2)"
@@ -221,6 +236,7 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 80vw;
 }
 
 .preview {
@@ -238,12 +254,10 @@ export default {
 }
 
 .matching-img {
-    max-width: 100%;
-    height: auto;
     margin-top: 20px;
     border: 2px dashed #007bff;
     border-radius: 10px;
-    padding: 10px;
+
     background-color: #f8f9fa;
 }
 
@@ -339,8 +353,8 @@ input[type="file"] {
 }
 .dual-box-wrapper {
     display: flex;
-    width: 30%;
-    justify-content: space-between; /* 让两边分开 */
+
+    justify-content: space-evenly; /* 让两边分开 */
     align-items: center; /* 垂直居中矮的盒子 */
     margin-top: 20px;
     margin-bottom: 20px;
@@ -349,7 +363,7 @@ input[type="file"] {
 .left-box {
     flex: 0 0 10%; /* 固定宽度可调 */
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
 }
 
 .right-box {
@@ -357,5 +371,29 @@ input[type="file"] {
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+.shangbian {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    column-gap: 70px;
+    position: relative;
+    left: -80px;
+}
+
+.rightrightbox {
+    display: flex;
+    margin-left: 60px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 20px;
+
+    max-width: 40px;
+}
+.font{
+    font-family: 'MCFont';
 }
 </style>

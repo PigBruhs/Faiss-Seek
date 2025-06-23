@@ -57,7 +57,7 @@ export default {
     position:absolute;
     bottom: 0;
 
-    font-family: 'MyFont';
+    font-family: 'MCFont';
     color: rgb(44, 44, 44);
     margin-left: 50px;
     margin-bottom: 10px;

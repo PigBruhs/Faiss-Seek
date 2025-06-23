@@ -3,7 +3,7 @@
         <div class="left-section">
             <h1 class="webTitle">答而多图图</h1>
             <div class="user-actions">
-                <h2>欢迎，{{ role === 'admin' ? '管理员' : '用户' }} {{ userId }}</h2>
+                <h2 class="font">欢迎，{{ role === 'admin' ? '管理员' : '用户' }} {{ userId }}</h2>
                 <a-button type="primary" @click="logout">退出登录</a-button>
             </div>
             <div class="logo">
@@ -69,7 +69,7 @@ export default {
 }
 .webTitle {
     margin-right: 40px;
-    font-family: 'MyFont';
+    font-family: 'MCFont';
     color: rgb(44, 44, 44);
 }
 .user-actions {
@@ -87,5 +87,8 @@ export default {
     bottom: 0;
     right: 0;
     margin-right: 150px;
+}
+.font{
+    font-family: 'MCFont';
 }
 </style>

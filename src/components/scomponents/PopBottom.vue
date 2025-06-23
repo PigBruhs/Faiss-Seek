@@ -8,14 +8,13 @@
       position="bottom"
       content-class="fade-pop transparent-pop"
     >
-      <div class="popover-trigger" @click="handleClick(item.title)">
-        <span class="title">{{ item.title }}</span>
-        <a-divider direction="vertical" />
+      <div class="popover-trigger" @click="handleClick(index,item.title)":class="{ active: activeIndex === index }">
         <img :src="item.icon" class="icon" />
+        <span class="title">{{ item.title }}</span>
       </div>
 
       <template #content>
-        <p>{{ item.content }}</p>
+        <p class="font">{{ item.content }}</p>
       </template>
     </a-popover>
   </div>
@@ -39,10 +38,11 @@ const items = [
     content: 'vgg16 是一个深度卷积神经网络，以其简单的结构和高效的性能著称。',
   },
 ];
-
+const activeIndex = ref(null);
 // 向父组件传递点击的 title
 const emit = defineEmits(['onTitleClick']);
-const handleClick = (title) => {
+const handleClick = (index,title) => {
+  activeIndex.value = index;
   emit('onTitleClick', title);
 };
 </script>
@@ -51,14 +51,15 @@ const handleClick = (title) => {
 /* 样式保持不变 */
 .popover-container {
   display: flex;
-  width: 100vw;
-  height: 200px;
+  flex-direction: column;
+  width: 100%;
+  row-gap: -50px;
 }
 
 .popover-container > * {
   flex: 1;
   display: flex;
-  justify-content: center;
+  justify-content: left;
   align-items: center;
 }
 
@@ -70,9 +71,15 @@ const handleClick = (title) => {
 .popover-trigger:hover {
   transform: scale(1.1);
 }
+.popover-trigger.active {
+  border: 4px dashed transparent; /* 激活状态的虚线边框 */
+  border-image: linear-gradient(45deg, #ff0000, #00ff00, #0000ff, #ff00ff);
+  border-image-slice: 1;
+  animation: rotate-border 2s linear infinite; /* 添加旋转动画 */
+}
 .icon {
-  width: 160px;
-  height: 160px;
+  width: 120px;
+  height: 120px;
 }
 
 .fade-pop {
@@ -87,6 +94,14 @@ const handleClick = (title) => {
   color: #333;
 }
 
+.title {
+  font-weight: bold;
+  font-family: 'MCFont';
+}
+.font{
+  font-family: 'MCFont';
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -95,6 +110,14 @@ const handleClick = (title) => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+@keyframes rotate-border {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 </style>
