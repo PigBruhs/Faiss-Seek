@@ -130,7 +130,7 @@ class ImageService:
                 model_folders = [index_folder / model for model in ["resnet50", "vgg16", "vit16"]]
                 index_counts = [len(list(folder.glob("*.index"))) for folder in model_folders if folder.exists()]
 
-                if len(set(index_counts)) == 1:  # 检查数量是否一致
+                if len(set(index_counts)) == 1:  # 检查数量是否���致
                     index_count = index_counts[0]
                 else:
                     raise ValueError("三个模型文件夹下的索引数量不一致")
@@ -170,6 +170,9 @@ class ImageService:
 
     def img_search(self, img=None,img_path=None,model="vgg16", top_n=5, mode="local", name=None):
         try:
+            # 如果是 Flask 上传的文件，将其转换为 PIL Image
+            if hasattr(img, 'stream'):
+                img = Image.open(img.stream)
 
             # 调用搜索服务
             topn = search_topn(image_path=img_path, image=img,model=model, top_n=top_n, fe=self.fe, mode=mode, name=name)
@@ -219,9 +222,3 @@ if __name__ == "__main__":
     test_image = Image.open("../data/search/002_anchor_image_0001.jpg")
     search_result = service.img_search(test_image, model="vgg16", top_n=5, mode="url", name="test_index")
     print(search_result)
-
-
-
-
-
-
