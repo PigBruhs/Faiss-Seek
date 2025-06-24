@@ -104,46 +104,60 @@ class ImageService:
 
     # <<< 已修改: 简化线程启动逻辑
     def reconstruct_index_base(self, name=None, path_or_url=None, max_imgs=4096):
-        try:
-            if not (path_or_url and (path_or_url.startswith("http://") or path_or_url.startswith("https://"))):
-                return {"success": False, "message": "无效的URL，请输入以http://或https://开头的网址"}
-
-            print("[服务] 准备启动下载和索引双线程...")
+        # 判断是URL还是本地路径
+        is_url = path_or_url and (path_or_url.startswith("http://") or path_or_url.startswith("https://"))
+        if not is_url and Path(path_or_url).exists():
+            input_folder = str(path_or_url)
+            index_folder = Path("../index_base/local")
+            for model in ["resnet50", "vgg16", "vit16"]:
+                build_index_base(
+                    input_folder=input_folder,
+                    index_folder=str(index_folder / model),
+                    fe=self.fe,
+                    model=model
+                )
+            return {"success": False, "message": "本地图源更新完毕"}
+        elif is_url:
+            try:
+                print("[服务] 准备启动下载和索引双线程...")
             # 创建下载和索引的线程
-            download_thread = threading.Thread(target=self.download_images, args=(path_or_url, name, max_imgs))
-            index_thread = threading.Thread(target=self.index_images, args=(name,))
+                download_thread = threading.Thread(target=self.download_images, args=(path_or_url, name, max_imgs))
+                index_thread = threading.Thread(target=self.index_images, args=(name,))
 
             # 同时启动，它们将通过 self.task_queue 进行协作
-            download_thread.start()
-            index_thread.start()
+                download_thread.start()
+                index_thread.start()
 
             # 等待两个线程都执行完毕
-            download_thread.join()
-            print("[服务] 下载线程已结束。")
-            index_thread.join()
-            print("[服务] 索引线程已结束。")
-            
-            print("[服务] 所有任务已完成。")
-            
+                download_thread.join()
+                print("[服务] 下载线程已结束。")
+                index_thread.join()
+                print("[服务] 索引线程已结束。")
+
+                print("[服务] 所有任务已完成。")
+
             # ... (后续的成功/失败返回逻辑保持不变) ...
-            index_folder = Path(f"../index_base/url/{name}")
-            if not index_folder.exists():
-                return {"success": True, "message": f"{name} 索引库重建完成，但未生成任何索引文件（可能未爬取到图片）。", "index_count": 0}
-                
-            index_counts = [len(list((index_folder / model).glob("*.index"))) for model in ["resnet50", "vgg16", "vit16"]]
-            
-            if len(set(index_counts)) > 1:
-                print(f"[警告] 三个模型文件夹下的索引数量不一致: {index_counts}")
-            
-            index_count = index_counts[0] if index_counts else 0
+                index_folder = Path(f"../index_base/url/{name}")
+                if not index_folder.exists():
+                    return {"success": True, "message": f"{name} 索引库重建完成，但未生成任何索引文件（可能未爬取到图片）。",
+                            "index_count": 0}
 
-            return {"success": True, "message": f"{name} 索引库重建成功", "index_count": index_count}
+                index_counts = [len(list((index_folder / model).glob("*.index"))) for model in
+                                ["resnet50", "vgg16", "vit16"]]
 
-        except Exception as e:
-            print(f"索引库重建失败: {e}")
+                if len(set(index_counts)) > 1:
+                    print(f"[警告] 三个模型文件夹下的索引数量不一致: {index_counts}")
+
+                index_count = index_counts[0] if index_counts else 0
+
+                return {"success": True, "message": f"{name} 索引库重建成功", "index_count": index_count}
+
+            except Exception as e:
+                 print(f"索引库重建失败: {e}")
             import traceback
             traceback.print_exc()
             return {"success": False, "message": f"{name} 索引库重建失败: {str(e)}", "index_count": -1}
+        return None
 
     # ... (destroy_index_base 和 img_search 方法无需修改) ...
     def destroy_index_base(self,name=None):
