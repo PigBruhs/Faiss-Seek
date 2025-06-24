@@ -40,7 +40,7 @@ class Crawler:
         self.max_images = max_images
         self.current_batch = 0
         self.proxy_list = proxy_list or []
-        
+
         os.makedirs(f"../crawled_images/{self.name}", exist_ok=True)
         self.use_selenium = use_selenium and SELENIUM_AVAILABLE
         if self.use_selenium:
@@ -104,9 +104,9 @@ class Crawler:
         while self.url_queue and len(self.image_urls) < self.max_images:
             current_url = self.url_queue.popleft()
             print(f"[处理] URL: {current_url}")
-            print(f"    已访问: {len(self.visited_urls)}, 队列: {len(self.url_queue)}, 图片收集: {len(self.image_urls)}")
+            print(f"已访问: {len(self.visited_urls)}, 队列: {len(self.url_queue)}, 图片收集: {len(self.image_urls)}")
             if current_url in self.visited_urls:
-                print("    跳过，已访问过")
+                print("跳过，已访问过")
                 continue
             self.visited_urls.add(current_url)
 
