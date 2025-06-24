@@ -1,53 +1,43 @@
 import os
-<<<<<<< HEAD
 import time
 import random
 import base64
 from collections import deque
 from urllib.parse import urljoin, urlparse
-=======
->>>>>>> parent of b98f11f (修改了爬虫，并且增加调试信息)
 import requests
 from bs4 import BeautifulSoup
-import random
-import hashlib
-from urllib.parse import urlparse, urljoin
-from collections import deque
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Optional Selenium for dynamic content loading
+try:
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.action_chains import ActionChains
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
 
 HEADERS = [
-        {
-            "User-Agent": "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36"},
-        {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 Safari/537.36"},
-        {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:30.0) Gecko/20100101 Firefox/30.0"},
-        {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.75.14 (KHTML, like Gecko) Version/7.0.3 Safari/537.75.14"},
-        {"User-Agent": "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Win64; x64; Trident/6.0)"},
-        {"User-Agent": "Mozilla/5.0 (Windows; U; Windows NT 5.1; it; rv:1.8.1.11) Gecko/20071127 Firefox/2.0.0.11"},
-        {"User-Agent": "Opera/9.25 (Windows NT 5.1; U; en)"},
-        {
-            "User-Agent": "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; .NET CLR 1.1.4322; .NET CLR 2.0.50727)"},
-        {"User-Agent": "Mozilla/5.0 (compatible; Konqueror/3.5; Linux) KHTML/3.5.5 (like Gecko) (Kubuntu)"},
-        {
-            "User-Agent": "Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8.0.12) Gecko/20070731 Ubuntu/dapper-security Firefox/1.5.0.12"},
-        {"User-Agent": "Lynx/2.8.5rel.1 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/1.2.9"},
-        {
-            "User-Agent": "Mozilla/5.0 (X11; Linux i686) AppleWebKit/535.7 (KHTML, like Gecko) Ubuntu/11.04 Chromium/16.0.912.77 Chrome/16.0.912.77 Safari/535.7"},
-        {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0"}
+    {"User-Agent": "Mozilla/5.0 (Windows NT 6.3; WOW64)..."},
+    # ... 更多UA 省略
 ]
 
-class crawler:
+class Crawler:
     """
     爬虫类，用于爬取指定网站的图片链接并下载图片。
+    支持静态和动态加载、滚动、load-more点击以及基本反反爬手段。
+    添加丰富的调试输出，方便观察爬取进度。
     """
 
-    def __init__(self,url,name,max_images=1024):
+    def __init__(self, url, name, max_images=1024, use_selenium=False, proxy_list=None):
         self.name = name
-        self.image_urls = set()  # 存储爬取到的图片链接
-        self.visited_urls = set()  # 存储已访问的页面链接
+        self.image_urls = set()
+        self.visited_urls = set()
         self.url_queue = deque([url])
         self.max_images = max_images
-<<<<<<< HEAD
         self.current_batch = 0
         self.proxy_list = proxy_list or []
 
@@ -83,104 +73,113 @@ class crawler:
 
         # 添加前缀
         return f"base64_{filename_safe}"
-=======
-        self.current_batch=0
-        os.makedirs(f"../crawled_images/{self.name}",exist_ok=True)  # 确保目录存在
 
-    def generate_filename_from_url(self,url):
-        """通过URL生成唯一的文件名"""
-        filename = hashlib.md5(url.encode('utf-8')).hexdigest()
-        self.url_to_filename_map[filename] = url
-        return hashlib.md5(url.encode('utf-8')).hexdigest()
+    def _random_headers(self):
+        return random.choice(HEADERS)
 
-    def decoder(self):
-        """通过文件名解码回URL"""
-        return self.url_to_filename_map
->>>>>>> parent of b98f11f (修改了爬虫，并且增加调试信息)
+    def _random_proxy(self):
+        return random.choice(self.proxy_list) if self.proxy_list else None
+
+    def _delay(self):
+        time.sleep(random.uniform(1, 3))  # 随机延迟
+
+    def _scroll_and_load(self):
+        body = self.driver.find_element(By.TAG_NAME, 'body')
+        for _ in range(5):
+            ActionChains(self.driver).send_keys("\ue00f").perform()
+            time.sleep(1)
+        try:
+            load_more = self.wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'更多') or contains(text(),'Load More')]") ))
+            load_more.click()
+            time.sleep(2)
+        except Exception:
+            pass
 
     def crawl_page(self):
-
+        """
+        广度优先爬取页面，收集图片链接。
+        添加调试输出：当前 URL、已抓取图片数、队列长度。
+        """
+        print(f"[启动爬虫] 初始 URL: {self.url_queue[0]}, 最大图片: {self.max_images}")
         while self.url_queue and len(self.image_urls) < self.max_images:
             current_url = self.url_queue.popleft()
-<<<<<<< HEAD
             print(f"[处理] URL: {current_url}")
             print(f"已访问: {len(self.visited_urls)}, 队列: {len(self.url_queue)}, 图片收集: {len(self.image_urls)}")
             if current_url in self.visited_urls:
                 print("跳过，已访问过")
-=======
-            if current_url in self.visited_urls:
->>>>>>> parent of b98f11f (修改了爬虫，并且增加调试信息)
                 continue
+            self.visited_urls.add(current_url)
 
             try:
-                resp = requests.get(current_url, headers=random.choice(HEADERS), timeout=10)
-                if resp.status_code != 200:
-                    print(f"无法访问 {current_url}，状态码: {resp.status_code}")
-                    continue
+                if self.use_selenium:
+                    self.driver.get(current_url)
+                    self._delay()
+                    self._scroll_and_load()
+                    html = self.driver.page_source
+                else:
+                    session = requests.Session()
+                    headers = self._random_headers()
+                    proxy = self._random_proxy()
+                    print(f"    请求头: {headers['User-Agent']}, 代理: {proxy}")
+                    resp = session.get(current_url, headers=headers, proxies={'http': proxy, 'https': proxy} if proxy else None, timeout=10)
+                    if resp.status_code != 200:
+                        print(f"    请求失败，状态码 {resp.status_code}")
+                        continue
+                    html = resp.text
 
-                soup = BeautifulSoup(resp.text, 'html.parser')
-                self.visited_urls.add(current_url)
+                soup = BeautifulSoup(html, 'html.parser')
 
-                # 提取图片链接
                 for img in soup.find_all('img'):
                     src = img.get('src')
-                    if src:
-                        # 处理相对URL
-                        img_url = urljoin(current_url, src)
-                        if (img_url.startswith('http') or img_url.startswith('https')) and "logo" not in img_url:
+                    if not src:
+                        continue
+                    img_url = urljoin(current_url, src)
+                    if img_url.startswith('http') and 'logo' not in img_url:
+                        if img_url not in self.image_urls:
                             self.image_urls.add(img_url)
-                            print(f"[{len(self.image_urls)}/{self.max_images}] 发现图片: {img_url}")
+                            print(f"    新图片 [{len(self.image_urls)}]: {img_url}")
                         if len(self.image_urls) >= self.max_images:
                             break
 
-                # 提取页面内的所有链接并加入队列进行递归爬取
                 for a_tag in soup.find_all('a', href=True):
                     next_url = urljoin(current_url, a_tag['href'])
-                    if next_url.startswith('http') or next_url.startswith('https'):
+                    if next_url.startswith('http') and next_url not in self.visited_urls:
                         self.url_queue.append(next_url)
+                self._delay()
 
             except Exception as e:
-                print(f"爬取失败: {e}")
+                print(f"爬取失败 {current_url}: {e}")
+
+        if self.use_selenium:
+            self.driver.quit()
+        print(f"[结束] 共抓取图片 {len(self.image_urls)}，访问网页 {len(self.visited_urls)}")
 
     def save_image(self):
         """
-        下载图片到指定文件夹，并以哈希值命名。
-        每次下载128张后结束，支持断点续传。
+        下载图片到指定文件夹，每次128张后断点续传。
+        添加下载日志。
         """
-
         target_folder = f"../crawled_images/{self.name}/batch{self.current_batch}"
-        os.makedirs(target_folder,exist_ok=True)  # 确保目录存在
-        # 记录已下载的图片数量
-        downloaded_count = len(os.listdir(target_folder)) if os.path.exists(target_folder) else 0
+        os.makedirs(target_folder, exist_ok=True)
+        downloaded = len(os.listdir(target_folder))
+        print(f"[保存] 批次 {self.current_batch}, 已下载 {downloaded}/{len(self.image_urls)}")
 
-        for idx, url in enumerate(list(self.image_urls)[downloaded_count:], 1):
-            if downloaded_count >= 128 or downloaded_count >= self.max_images:  # 每次下载128张后结束
-                print(f"暂停下载")
+        for idx, url in enumerate(list(self.image_urls)[downloaded:], start=downloaded+1):
+            if idx > downloaded and (idx-1) % 128 == 0 and idx-1 != downloaded:
                 self.current_batch += 1
-<<<<<<< HEAD
                 print(f"达到128张，切换到批次 {self.current_batch}")
-=======
->>>>>>> parent of b98f11f (修改了爬虫，并且增加调试信息)
                 break
-
             try:
-                resp = requests.get(url, timeout=10)
+                resp = requests.get(url, headers=self._random_headers(), timeout=10)
                 if resp.status_code == 200:
-<<<<<<< HEAD
                     fn = self.filename_hash(url)
                     ext = os.path.splitext(urlparse(url).path)[-1]
                     if ext.lower() not in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
                         print(f"跳过非图片资源: {url}")
-=======
-                    filename = self.generate_filename_from_url(url)  # 使用URL的哈希值作为文件名
-                    file_extension = os.path.splitext(urlparse(url).path)[-1]  # 获取文件扩展名
-                    if file_extension not in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:  # 只保存静态图片
->>>>>>> parent of b98f11f (修改了爬虫，并且增加调试信息)
                         continue
-                    path = os.path.join(target_folder, f"{filename}{file_extension}")
+                    path = os.path.join(target_folder, fn + ext)
                     with open(path, 'wb') as f:
                         f.write(resp.content)
-<<<<<<< HEAD
                     print(f"保存 [{idx}/{len(self.image_urls)}]: {path}")
                 else:
                     print(f"下载失败 {resp.status_code}: {url}")
@@ -188,20 +187,6 @@ class crawler:
                 print(f"错误下载 {url}: {e}")
         print(f"[保存结束] 批次 {self.current_batch}, 下载完成 {len(os.listdir(target_folder))}张图片")
 
-=======
-                    downloaded_count += 1
-                    print(f"[{downloaded_count}/{len(self.image_urls)}] 保存: {path}")
-                else:
-                    print(f"下载失败 ({resp.status_code}): {url}")
-            except Exception as e:
-                print(f"错误下载: {url} -> {e}")
-
-
-
-
-
-
->>>>>>> parent of b98f11f (修改了爬虫，并且增加调试信息)
 if __name__ == "__main__":
     url = "https://www.hippopx.com"  # 替换为你要爬取的目标网站
     name = "example_crawl"
@@ -214,4 +199,4 @@ if __name__ == "__main__":
 
     print(f"爬取完成，共下载 {len(crawler_instance.image_urls)} 张图片。")
 
-    print(crawler_instance.url_to_filename_map.get("7e69c83febde6ce0174d2ba162cc3b23"))
+
