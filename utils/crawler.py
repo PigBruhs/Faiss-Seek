@@ -1,7 +1,7 @@
 import os
 import time
 import random
-import hashlib
+import base64
 from collections import deque
 from urllib.parse import urljoin, urlparse
 import requests
@@ -37,7 +37,6 @@ class Crawler:
         self.image_urls = set()
         self.visited_urls = set()
         self.url_queue = deque([url])
-        self.url_to_filename_map = {}
         self.max_images = max_images
         self.current_batch = 0
         self.proxy_list = proxy_list or []
@@ -51,13 +50,29 @@ class Crawler:
             self.driver = webdriver.Chrome(options=options)
             self.wait = WebDriverWait(self.driver, 10)
 
-    def generate_filename_from_url(self, url):
-        filename = hashlib.md5(url.encode('utf-8')).hexdigest()
-        self.url_to_filename_map[filename] = url
-        return filename
+    def filename_hash(self,input_str):
+        """
+        将输入字符串转换为可作为Windows文件名的可逆哈希值
 
-    def decoder(self):
-        return self.url_to_filename_map
+        参数:
+            input_str: 要转换的字符串
+        返回:
+            可用作Windows文件名的可逆哈希字符串
+        """
+        # 将输入转换为bytes
+        if isinstance(input_str, str):
+            input_bytes = input_str.encode('utf-8')
+        else:
+            input_bytes = input_str
+
+        # 使用Base64编码
+        encoded = base64.b64encode(input_bytes).decode('ascii')
+
+        # 替换Windows文件名不允许的字符
+        filename_safe = encoded.replace('/', '-').replace('+', '_').replace('=', '@')
+
+        # 添加前缀
+        return f"base64_{filename_safe}"
 
     def _random_headers(self):
         return random.choice(HEADERS)
@@ -152,33 +167,30 @@ class Crawler:
         for idx, url in enumerate(list(self.image_urls)[downloaded:], start=downloaded+1):
             if idx > downloaded and (idx-1) % 128 == 0 and idx-1 != downloaded:
                 self.current_batch += 1
-                print(f"    达到128张，切换到批次 {self.current_batch}")
+                print(f"达到128张，切换到批次 {self.current_batch}")
                 break
             try:
                 resp = requests.get(url, headers=self._random_headers(), timeout=10)
                 if resp.status_code == 200:
-                    fn = self.generate_filename_from_url(url)
+                    fn = self.filename_hash(url)
                     ext = os.path.splitext(urlparse(url).path)[-1]
                     if ext.lower() not in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
-                        print(f"    跳过非图片资源: {url}")
+                        print(f"跳过非图片资源: {url}")
                         continue
                     path = os.path.join(target_folder, fn + ext)
                     with open(path, 'wb') as f:
                         f.write(resp.content)
-                    print(f"    保存 [{idx}/{len(self.image_urls)}]: {path}")
+                    print(f"保存 [{idx}/{len(self.image_urls)}]: {path}")
                 else:
-                    print(f"    下载失败 {resp.status_code}: {url}")
+                    print(f"下载失败 {resp.status_code}: {url}")
             except Exception as e:
-                print(f"    错误下载 {url}: {e}")
+                print(f"错误下载 {url}: {e}")
         print(f"[保存结束] 批次 {self.current_batch}, 下载完成 {len(os.listdir(target_folder))}张图片")
-
-# 保持向下兼容：老代码直接 crawler(...) 实际调用 Crawler
-crawler = Crawler
 
 if __name__ == "__main__":
     url = "https://www.hippopx.com"  # 替换为你要爬取的目标网站
     name = "example_crawl"
-    crawler_instance = crawler(url, name, max_images=8)
+    crawler_instance = Crawler(url, name, max_images=8)
 
     # 爬取页面
     crawler_instance.crawl_page()

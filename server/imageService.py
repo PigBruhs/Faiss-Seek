@@ -9,31 +9,26 @@ import shutil
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.index_base import build_index_base
-from utils.index_search import searcher
+from utils.index_search import search_topn
 from utils.feature_extraction import feature_extractor
-from utils.crawler import crawler
-from flask import Flask, request, jsonify
+from utils.crawler import Crawler
 from tqdm import tqdm
 
 class ImageService:
     def __init__(self):
         self.fe = feature_extractor()
-        self.searcher = searcher()
         self.task_queue = queue.Queue()
-        self.url_to_filename_map = {}
 
     def download_images(self, url, name, max_imgs=128):
-        base_image_folder = Path(f"../crawled_images/{name}")  # 注意拼写是crawled_images
+        base_image_folder = Path(f"../crawled_images/{name}")
         base_image_folder.mkdir(parents=True, exist_ok=True)
-        crawl = crawler(url,name,max_imgs)
+        crawl = Crawler(url,name,max_imgs)
         crawl.crawl_page()
 
         total_batches = (max_imgs + 127) // 128
         for batch_num in tqdm(range(total_batches)):
 
             crawl.save_image()
-            self.url_to_filename_map = crawl.decoder()
-            print("URL 到文件名映射:", self.url_to_filename_map)
 
             # 通知索引线程处理新批次
             self.task_queue.put(crawl.current_batch)
@@ -185,7 +180,7 @@ class ImageService:
             img = Image.open(img.stream).convert('RGB')
 
             # 调用搜索服务
-            topn = searcher.search_topn(image=img, model=model, top_n=top_n, fe=self.fe, mode=mode, name=name)
+            topn = search_topn(image=img, model=model, top_n=top_n, fe=self.fe, mode=mode, name=name)
 
             # 检查返回结果格式
             if not isinstance(topn, list):
@@ -215,21 +210,6 @@ class ImageService:
                 "message": f"图片匹配失败，{e}"
             }
 
-    def decoder_ring(self, results):
-        res = []
-        print("传递给 decoder_ring 的结果:", results)  # 打印 results 的内容
-        for item in results:
-            name = item.get("name")  # 从字典中获取 name
-            score = item.get("score")  # 从字典中获取 score
-
-            # 直接使用完整文件名查找 URL
-            filename = self.url_to_filename_map.get(name)
-
-            if filename is None:
-                print(f"未找到对应的文件名: {name}")
-                continue
-            res.append((filename, score))
-        return res
 
 
 
@@ -238,7 +218,7 @@ if __name__ == "__main__":
 
     # 测试索引重建
 
-    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=256)
+    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=129)
     print(result)
 
 
@@ -246,7 +226,7 @@ if __name__ == "__main__":
     from PIL import Image
     test_image = Image.open("../data/search/002_anchor_image_0001.jpg")
     search_result = service.img_search(test_image, model="vgg16", top_n=5, mode="url", name="test_index")
-    print(service.decoder_ring(search_result))
+    print(search_result)
 
 
 

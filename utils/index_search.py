@@ -2,6 +2,7 @@ import os
 import faiss
 import numpy as np
 import sys
+import base64  # 添加缺失的base64导入
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.index_base import load_index_base
@@ -9,12 +10,36 @@ from utils.feature_extraction import feature_extractor
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑着两个pytorch导致它报的不安全。实际情况应该不会用到
 
-class searcher:
-    """
-    用于检索图片的类，初始化时加载索引文件夹。
-    """
 
-    def search_topn(
+def reverse_filename_hash(hashed_str):
+    """
+    将哈希值还原为原始字符串
+
+    参数:
+        hashed_str: 哈希后的字符串
+    返回:
+        原始字符串
+    """
+    # 移除前缀
+    if hashed_str.startswith("base64_"):
+        encoded = hashed_str[7:]
+    else:
+        raise ValueError("不是有效的哈希文件名")
+
+    # 还原Base64编码中被替换的字符
+    base64_str = encoded.replace('-', '/').replace('_', '+').replace('@', '=')
+
+    # Base64解码
+    decoded_bytes = base64.b64decode(base64_str)
+
+    # 尝试将bytes转回字符串
+    try:
+        return decoded_bytes.decode('utf-8')
+    except UnicodeDecodeError:
+        return decoded_bytes
+
+
+def search_topn(
             image_path: str = None,
             image=None,
             top_n: int = 5,
@@ -85,7 +110,14 @@ class searcher:
             results = []
             for idx, score in zip(indices[0], distances[0]):
                 if idx < len(names):
-                    results.append((names[idx], float(score)))
+                    encoded_name = names[idx]
+                    # 尝试解码名称
+                    try:
+                        original_name = reverse_filename_hash(encoded_name)
+                        results.append((original_name, float(score)))
+                    except ValueError:
+                        # 如果不是有效的哈希名称，保留原始名称
+                        results.append((encoded_name, float(score)))
                 else:
                     print(f"跳过无效的索引: {idx}")
             return results
@@ -94,16 +126,15 @@ class searcher:
             return []
 
 
-"""
+
 if __name__ == "__main__":
-    # 测试用例
-    from utils.feature_extraction import feature_extractor
+    fe = feature_extractor()
     test_image = "../data/search/002_anchor_image_0001.jpg"
     from PIL import Image
-    fe = feature_extractor()
-    results = searcher.search_topn(image=Image.open(test_image), model="vgg16", fe=fe, top_n=5, mode="url", name="test_index")
+
+    results = search_topn(image=Image.open(test_image), model="vgg16", fe=fe, top_n=5, mode="local")
     print(results)
-"""
+
 
 
 
