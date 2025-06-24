@@ -24,7 +24,7 @@ class ImageService:
         self.url_to_filename_map = {}
 
     # <<< 已修改: 此方法逻辑已大幅简化和修正
-    def download_images(self, url, name, max_imgs=128):
+    def download_images(self, url, name, max_imgs=296):
         """
         启动爬虫下载图片。此方法现在只负责创建和启动爬虫，不干涉其内部线程管理。
         """

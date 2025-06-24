@@ -15,7 +15,12 @@ import re
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import WebDriverException, TimeoutException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+# <<< 核心修改: 导入webdriver-manager，用于自动管理ChromeDriver
+from webdriver_manager.chrome import ChromeDriverManager
 
 # --- 常量和设置 ---
 # 更新HEADERS，使用更真实的浏览器头部
@@ -46,7 +51,8 @@ class crawler:
     一个高效、多线程的爬虫，用于查找和下载网站上的图片。
     它现在使用Selenium来处理JavaScript动态渲染的网站。
     """
-    def __init__(self, url, name, max_images=1024, crawl_threads=2, download_threads=4, task_queue=None): # <<< 修改: 建议减少爬虫线程数
+    # <<< 核心修改: 将默认爬虫线程改为1，避免竞争并提高效率
+    def __init__(self, url, name, max_images=1024, crawl_threads=1, download_threads=8, task_queue=None):
         """
         初始化爬虫。
 
@@ -54,7 +60,7 @@ class crawler:
             url (str): 起始URL。
             name (str): 会话名称。
             max_images (int): 最大图片数。
-            crawl_threads (int): 爬取线程数。由于Selenium资源消耗较大，建议设为1或2。
+            crawl_threads (int): 爬取线程数。由于Selenium资源消耗大且为避免竞争，强烈建议设为1。
             download_threads (int): 下载线程数。
             task_queue (queue.Queue, optional): 用于通知批处理完成的任务队列。
         """
@@ -97,43 +103,29 @@ class crawler:
         
         # --- Selenium WebDriver 设置 ---
         chrome_options = Options()
-        chrome_options.add_argument("--headless")  # 无头模式，不在前台显示浏览器
+        chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--window-size=1920,1080") # 设置窗口大小以加载桌面版网页
-        # 伪装成真实浏览器
+        chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument(f'user-agent={random.choice(HEADERS)["User-Agent"]}')
-        
+        # 阻止加载图片和CSS可以加快页面加载速度
+        chrome_options.add_argument("--blink-settings=imagesEnabled=false")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"]) # 减少控制台不必要的日志
+
         driver = None
         try:
-            # 使用PROJECT_ROOT构建chromedriver路径
-            # 假设chromedriver.exe在项目根目录下
-            driver_path = os.path.join(PROJECT_ROOT, "chromedriver.exe")
-            
-            # 如果在Linux/Mac系统，文件名可能不同
-            if not os.path.exists(driver_path):
-                driver_path = os.path.join(PROJECT_ROOT, "chromedriver")
-            
-            # 检查文件是否存在
-            if not os.path.exists(driver_path):
-                print(f"[错误] ChromeDriver 未找到。请将 chromedriver.exe 放置在项目根目录: {PROJECT_ROOT}")
-                print(f"[提示] 当前查找路径: {driver_path}")
-                print(f"[提示] 您可以从 https://chromedriver.chromium.org/ 下载 ChromeDriver")
-                return  # 无法启动浏览器，此线程退出
-            
-            print(f"[信息] 使用 ChromeDriver 路径: {driver_path}")
-            service = Service(executable_path=driver_path)
+            # <<< 核心修改: 使用 webdriver-manager 自动管理 ChromeDriver
+            # 这将自动下载并配置与您安装的Chrome版本匹配的驱动程序。
+            # 您不再需要手动下载和设置 'driver_path'。
+            print(f"[Selenium] 线程 {threading.current_thread().name} 正在准备WebDriver...")
+            service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
             print(f"[Selenium] 线程 {threading.current_thread().name} 的WebDriver初始化成功。")
-            
-        except WebDriverException as e:
+        except Exception as e:
             print(f"[严重错误] WebDriver初始化失败: {e}")
-            print(f"[提示] 请检查以下几点:")
-            print(f"  1. ChromeDriver 是否已下载并放置在: {PROJECT_ROOT}")
-            print(f"  2. ChromeDriver 版本是否与您的 Chrome 浏览器版本匹配")
-            print(f"  3. ChromeDriver 是否有执行权限")
+            print("[提示] 请确保您已安装 'webdriver-manager' (pip install webdriver-manager) 并且网络连接正常。")
             return  # 无法启动浏览器，此线程退出
-        
+
         with self.lock:
             self._active_crawl_threads += 1
 
@@ -154,17 +146,42 @@ class crawler:
             print(f"[爬虫线程-{threading.current_thread().name}] 正在爬取: {current_url} ...")
 
             try:
-                # 使用Selenium加载页面
                 driver.get(current_url)
-                # 等待5-10秒，让JS有足够时间渲染页面。对于加载慢的网站，可能需要增加这个时间。
-                time.sleep(7)
                 
+                # <<< 核心功能增强: 模拟向下滚动以加载动态内容 >>>
+                print("[滚动] 开始模拟向下滚动页面...")
+                scroll_count = 0
+                max_scrolls = 10 # 最多滚动10次，防止无限循环
+                last_height = driver.execute_script("return document.body.scrollHeight")
+
+                while scroll_count < max_scrolls:
+                    # 检查是否已找到足够图片
+                    with self.lock:
+                        if len(self.queued_image_urls) >= self.max_images:
+                            print("[滚动] 已找到足够数量的图片，停止滚动。")
+                            break
+                    
+                    # 执行滚动
+                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    scroll_count += 1
+                    print(f"[滚动] 完成第 {scroll_count}/{max_scrolls} 次滚动。")
+                    
+                    # 等待新内容加载
+                    time.sleep(3) # 等待3秒
+                    
+                    # 检查页面高度是否变化，如果没变说明已到底部
+                    new_height = driver.execute_script("return document.body.scrollHeight")
+                    if new_height == last_height:
+                        print("[滚动] 页面高度未变，已到达底部。")
+                        break
+                    last_height = new_height
+
+                # 滚动结束后，获取最终的页面源代码
                 page_source = driver.page_source
                 soup = BeautifulSoup(page_source, 'html.parser')
                 
                 print(f"[调试] 页面 '{soup.title.string if soup.title else '无标题'}' 的内容长度为 {len(page_source)} 字符。")
 
-                # --- 查找图片 (逻辑保持不变) ---
                 img_count = 0
                 for img in soup.find_all('img'):
                     src = img.get('src') or img.get('data-src')
@@ -172,7 +189,6 @@ class crawler:
                     
                     img_url = urljoin(current_url, src)
 
-                    # 增加更宽松的图片URL判断
                     if any(ext in img_url.lower() for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']):
                         with self.lock:
                             if len(self.queued_image_urls) < self.max_images and img_url not in self.queued_image_urls:
@@ -180,9 +196,9 @@ class crawler:
                                 self.image_queue.put(img_url)
                                 img_count += 1
                 
-                print(f"[发现] 从 {current_url} 找到 {img_count} 张新图片。图片队列大小: {self.image_queue.qsize()}")
+                print(f"[发现] 从 {current_url} (滚动后) 找到 {img_count} 张新图片。图片队列大小: {self.image_queue.qsize()}")
 
-                # --- 查找链接 (逻辑保持不变) ---
+                # 在当前页面找链接的任务可以只做一次，或者减少其权重
                 link_count = 0
                 for a_tag in soup.find_all('a', href=True):
                     next_url = a_tag.get('href')
@@ -205,7 +221,7 @@ class crawler:
                 self.url_queue.task_done()
         
         if driver:
-            driver.quit() # 关闭浏览器，释放资源
+            driver.quit()
         
         with self.lock:
             self._active_crawl_threads -= 1
@@ -213,7 +229,6 @@ class crawler:
         print(f"[爬虫线程-{threading.current_thread().name}] 已退出。剩余活跃爬虫线程: {self._active_crawl_threads}")
 
     def _download_worker(self):
-        # 下载线程保持不变，继续使用requests，效率更高
         session = self._create_robust_session()
         while not self.stop_event.is_set():
             try:
