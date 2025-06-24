@@ -33,9 +33,10 @@ def decoder_ring(pname, results):
                 try:
                     # 提取编号
                     image_idx = name.split("_")[1].split(".")[0]
-
-                    # 查找映射文件
-                    index_base_path = Path(f"../index_base/url/{pname}")
+                    
+                    # 使用项目根目录作为基准
+                    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    index_base_path = os.path.join(PROJECT_ROOT, "index_base", "url", pname)
                     mapping_file = os.path.join(index_base_path, "url_mapping.json")
 
                     if os.path.exists(mapping_file):

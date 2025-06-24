@@ -49,7 +49,7 @@
                 <div class="image-gallery" v-if="imageList.length > 0">
                     <h2 class="font">搜索结果：</h2>
                     <div class="image-grid">
-                        <ImageDiv v-for="(image, index) in imageList" :key="index" :imageSrc1="image.url"
+                        <ImageDiv v-for="(image, index) in imageList" :key="index" :imageSrc1="image.name"
                             :imageTitle="image.name" :imageDescription="'相似度: ' + image.score.toFixed(2)"
                             :tooltipContent="'图片名称: ' + image.name" />
                     </div>
