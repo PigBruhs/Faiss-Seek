@@ -13,7 +13,7 @@
             <div v-for="web in webList" :key="web.id" class="web-item">
                 <label>
                     <input type="radio" :value="web.name" v-model="selectedWeb" />
-                    图源： {{ web.name }} 图源类型： {{ web.type }}
+                    图源:{{ web.name }}|图源类型:{{ web.type }}|图片数量:{{ web.index_count+1 }}|
                 </label>
                 <!-- 如果用户是 admin，则显示删除按钮 -->
                 <a-button type="outline" @click="showConfirm(web)" v-if="role === 'admin'" size="mini" shape="round"

@@ -27,8 +27,8 @@ class WebListService:
 
 webListService=WebListService()
 def GetWbebList():
-    db=cnnect_db()
-    cursor=db.cursor()
+    db = cnnect_db()
+    cursor = db.cursor()
     cursor.execute(
         '''
         CREATE TABLE IF NOT EXISTS webs(
@@ -43,30 +43,35 @@ def GetWbebList():
         )
         '''
     )
+    
+    # 修改SQL查询，包含index_count字段
     cursor.execute(
         '''
-        SELECT id,name,type FROM webs WHERE is_approved=1
+        SELECT id, name, type, index_count FROM webs WHERE is_approved=1
         '''
     )
+    
     print("如果数据库不存在则创建数据库")
-    data=cursor.fetchall()
-    webList=[]
-    if data is not None:
-        print("获取到了数据库数据：",data)
-        #将数据转化为字典
+    data = cursor.fetchall()
+    webList = []
+    
+    if data is not None and len(data) > 0:
+        print("获取到了数据库数据：", data)
+        # 将数据转化为字典
         for i in data:
-            j={
-            "id":i[0],
-            "name":i[1],
-            "type":i[2],
-
-        }
+            j = {
+                "id": i[0],
+                "name": i[1],
+                "type": i[2],
+                "index_count": i[3]  # 现在i[3]是有效的，因为查询包含了4个字段
+            }
             webList.append(j)
+        
         db.close()
-        result={"success":True,"webList":webList}
+        result = {"success": True, "webList": webList}
         return result
     else:
-        result={'success':False,"webList":{}}
+        result = {'success': False, "webList": []}  # 改为空数组而不是空对象
         db.close()
         return result
     
