@@ -1,4 +1,5 @@
 import os
+
 import faiss
 import numpy as np
 import sys
@@ -11,6 +12,7 @@ from utils.feature_extraction import feature_extractor
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑着两个pytorch导致它报的不安全。实际情况应该不会用到
 
 
+<<<<<<< HEAD
 def reverse_filename_hash(hashed_str):
     """
     将哈希值还原为原始字符串
@@ -40,6 +42,10 @@ def reverse_filename_hash(hashed_str):
 
 
 def search_topn(
+=======
+
+    def search_topn(
+>>>>>>> parent of b98f11f (修改了爬虫，并且增加调试信息)
             image_path: str = None,
             image=None,
             top_n: int = 5,
@@ -59,21 +65,18 @@ def search_topn(
         返回：
           List[(名称, 相似度)]
         """
-        try:
-            # 加载索引库
-            if mode == "local":
-                index_path = f"../index_base/local/{model}"
-            elif mode == "url":
-                index_path = f"../index_base/url/{name}/{model}"
-            else:
-                raise ValueError("Unsupported mode. Use 'local' or 'url'.")
-            print(f"加载索引路径: {index_path}")
-            index_base = load_index_base(index_path)
+        if mode == "local":
+            index_base = load_index_base(f"../index_base/local/{model}")
+        elif mode == "url":
+            index_base = load_index_base(f"../index_base/url/{name}/{model}")
+        else:
+            raise ValueError("Unsupported mode. Use 'local' or 'url'.")
+        query_img = fe.extract(image_path=image_path, image=image, model=model)
 
-            if not index_base:
-                print("索引库为空，无法进行搜索")
-                return []
+        query_vec = query_img.reconstruct_n(0, 1).astype(np.float32)
+        faiss.normalize_L2(query_vec)
 
+<<<<<<< HEAD
             # 提取查询向量
             if not image_path and not image:
                 raise ValueError("必须提供 image_path 或 image 参数")
@@ -123,7 +126,34 @@ def search_topn(
             return results
         except Exception as e:
             print(f"搜索失败，错误详情: {e}")
+=======
+        # 2. 合并底库所有向量并记录名称顺序
+        names, feats = [], []
+        for name, idx in index_base.items():
+            nt = idx.ntotal
+            if nt == 0:
+                continue
+            vecs = idx.reconstruct_n(0, nt).astype(np.float32)
+            faiss.normalize_L2(vecs)
+            for v in vecs:
+                names.append(name)
+                feats.append(v)
+        if not feats:
+>>>>>>> parent of b98f11f (修改了爬虫，并且增加调试信息)
             return []
+
+        features = np.stack(feats, axis=0)
+        d = features.shape[1]
+        # 3. 构建统一内积索引并添加所有向量
+        flat = faiss.IndexFlatIP(d)
+        flat.add(features)
+
+        # 4. 搜索并映射回名称
+        distances, indices = flat.search(query_vec, top_n)
+        results = []
+        for idx, score in zip(indices[0], distances[0]):
+            results.append((names[idx], float(score)))
+        return results
 
 
 
