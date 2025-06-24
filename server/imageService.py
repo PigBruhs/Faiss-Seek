@@ -11,8 +11,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.index_base import build_index_base
 from utils.index_search import search_topn
 from utils.feature_extraction import feature_extractor
-from utils.crawler import Crawler
+from utils.crawler import crawler
 from tqdm import tqdm
+import json
 
 class ImageService:
     def __init__(self):
@@ -22,7 +23,7 @@ class ImageService:
     def download_images(self, url, name, max_imgs=128):
         base_image_folder = Path(f"../crawled_images/{name}")
         base_image_folder.mkdir(parents=True, exist_ok=True)
-        crawl = Crawler(url,name,max_imgs)
+        crawl = crawler(url,name,max_imgs)
         crawl.crawl_page()
 
         total_batches = (max_imgs + 127) // 128
@@ -64,7 +65,7 @@ class ImageService:
             shutil.rmtree(batch_folder)
             self.task_queue.task_done()
 
-    def reconstruct_index_base(self, name=None,path_or_url=None, max_imgs=32767):
+    def reconstruct_index_base(self, name=None,path_or_url=None, max_imgs=4096):
         try:
             # 创建并启动线程
             if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
@@ -167,20 +168,11 @@ class ImageService:
             return {"success": False, "message": f"{name} 索引库删除失败"}
 
 
-    def img_search(self, img, model="vgg16", top_n=5, mode="local", name=None):
+    def img_search(self, img=None,img_path=None,model="vgg16", top_n=5, mode="local", name=None):
         try:
-            # 检查文件流
-            if not img or not hasattr(img, 'stream'):
-                return {
-                    "success": False,
-                    "message": "未接收到有效的图片文件"
-                }
-
-            # 打开图片并转换为 RGB
-            img = Image.open(img.stream).convert('RGB')
 
             # 调用搜索服务
-            topn = search_topn(image=img, model=model, top_n=top_n, fe=self.fe, mode=mode, name=name)
+            topn = search_topn(image_path=img_path, image=img,model=model, top_n=top_n, fe=self.fe, mode=mode, name=name)
 
             # 检查返回结果格式
             if not isinstance(topn, list):
@@ -218,7 +210,7 @@ if __name__ == "__main__":
 
     # 测试索引重建
 
-    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=129)
+    result = service.reconstruct_index_base(name="test_index", path_or_url="https://www.hippopx.com", max_imgs=6)
     print(result)
 
 
