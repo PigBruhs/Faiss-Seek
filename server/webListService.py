@@ -2,11 +2,13 @@ from flask import Flask, request, jsonify,g
 from flask_cors import CORS
 import sys
 import os
+import threading
 from dbService import cnnect_db
 import sqlite3
 import bcrypt
 from register import record_exists
 from imageService import ImageService
+db_init_lock = threading.Lock()
 imgservice= ImageService()
 class WebListService:
     def getWebList(self):
@@ -29,89 +31,87 @@ class WebListService:
 
 webListService=WebListService()
 def GetWbebList():
-    db = cnnect_db()
-    cursor = db.cursor()
-    cursor.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS webs(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        type TEXT ,
-        URL  TEXT NOT NULL,
-        info TEXT NOT NULL,
-        is_approved INTEGER DEFAULT 0,
-        is_create_index INTEGER DEFAULT 0,
-        index_count INTEGER DEFAULT 0
+    """
+    获取已批准的图源列表。
+    此函数经过重构，以解决代码冗余、逻辑错误和并发问题。
+    """
+    db = None  # 先声明，以确保 finally 块中可用
+    try:
+        db = cnnect_db()
+        cursor = db.cursor()
+
+        # 1. 确保表结构存在（幂等操作）
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS webs(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                type TEXT,
+                URL  TEXT NOT NULL,
+                info TEXT NOT NULL,
+                is_approved INTEGER DEFAULT 0,
+                is_create_index INTEGER DEFAULT 0,
+                index_count INTEGER DEFAULT 0
+            )
+            '''
         )
-        '''
-    )
-    
-    # 修改SQL查询，包含index_count字段
-    cursor.execute(
-        '''
-        SELECT id, name, type, index_count FROM webs WHERE is_approved=1
-        '''
-    )
-    
-    print("如果数据库不存在则创建数据库")
-    data = cursor.fetchall()
-    webList = []
-    
-    if data is not None and len(data) > 0:
-        print("获取到了数据库数据：", data)
-        # 将数据转化为字典
-        if not data[0][1]=="答而多图图":
-            #判断第一个是不是本地图源
-            print("第一个图源非本地图源，数据库结构有问题")
-        for i in data:
-            j = {
-                "id": i[0],
-                "name": i[1],
-                "type": i[2],
-                "index_count": i[3]  # 现在i[3]是有效的，因为查询包含了4个字段
-            }
-            webList.append(j)
-        
-        db.close()
-        result = {"success": True, "webList": webList}
-        return result
-    else:
-        #没有数据时，插入第一条数据为本地图源
+
+        # 2. 首先，尝试获取数据
         cursor.execute(
-        '''
-        INSERT INTO WEBS VALUES(?,?,?,?,?,?,?,?)
-        '''
-        ,(0,"答而多图图","本地图片网站","/data/base","本地图源",1,1,0)
-     )
-        #检索数据插入是否成功
-        cursor.execute(
-        '''
-        SELECT id, name, type, index_count FROM webs WHERE is_approved=1
-        '''
-    )
-    
-        print("如果数据库不存在则创建数据库")
+            'SELECT id, name, type, index_count FROM webs WHERE is_approved=1 ORDER BY id ASC'
+        )
         data = cursor.fetchall()
+
+        # 3. 如果没有数据，则进入线程安全的初始化流程
+        if not data:
+            # 使用 with 语句获取锁，确保只有一个线程能执行初始化
+            with db_init_lock:
+                # [关键] 获取锁后，必须再次检查数据是否存在，防止在等待锁时其他线程已完成初始化
+                cursor.execute('SELECT id FROM webs WHERE name = ?', ("答而多图图",))
+                if not cursor.fetchone():
+                    print("[INFO] (Locked) 数据库为空，正在插入默认本地图源...")
+                    # 使用规范的INSERT语句，不指定自增ID，让数据库自动分配
+                    cursor.execute(
+                        '''
+                        INSERT INTO webs (name, type, URL, info, is_approved, is_create_index, index_count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''',
+                        ("答而多图图", "本地图片网站", "/data/base", "本地图源", 1, 1, 0)
+                    )
+                    db.commit()
+
+            # 无论初始化是由哪个线程完成的，都重新查询一次以获取最新数据
+            print("[INFO] 重新查询图源列表...")
+            cursor.execute(
+                'SELECT id, name, type, index_count FROM webs WHERE is_approved=1 ORDER BY id ASC'
+            )
+            data = cursor.fetchall()
+
+
+        # 4. 将最终获取的数据格式化为列表 (此段代码只存在一份，消除了冗余)
         webList = []
-        if data is not None and len(data)> 0:
-             # 将数据转化为字典
-          if not data[0][1]=="答而多图图":
-            #判断第一个是不是本地图源
-            print("第一个图源非本地图源，数据库结构有问题")
-          for i in data:
-            j = {
-                "id": i[0],
-                "name": i[1],
-                "type": i[2],
-                "index_count": i[3]  # 现在i[3]是有效的，因为查询包含了4个字段
-            }
-            webList.append(j)
-            result = {'success': True, "webList": webList}  # 改为空数组而不是空对象
-            return result
-        else:
-             result = {'success': False, "webList": []}
-        db.close()
-        return result
+        # 在格式化前，可以进行一次安全检查
+        if data and data[0][1] != "答而多图图":
+             print("[WARN] 数据库结构可能存在问题：第一个图源不是'答而多图图'。")
+
+        for row in data:
+            webList.append({
+                "id": row[0],
+                "name": row[1],
+                "type": row[2],
+                "index_count": row[3]
+            })
+
+        return {"success": True, "webList": webList}
+
+    except Exception as e:
+        print(f"[ERROR] 获取图源列表时发生严重错误: {e}")
+        # 确保在出错时也返回符合前端预期的格式
+        return {"success": False, "webList": []}
+    finally:
+        # 5. 确保数据库连接在任何情况下都会被关闭
+        if db:
+            db.close()
     
 
 def AddWeb(data):
