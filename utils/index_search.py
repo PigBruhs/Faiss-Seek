@@ -26,36 +26,33 @@ def decoder_ring(pname: str, results: list[tuple]) -> list[tuple]:
         list: 解码后的结果列表，格式为 [('http://...', 0.54), ...]。
     """
     # 构造一次映射文件的路径，避免在循环中重复构造
-    try:
-        # 使用 Pathlib 提高路径操作的健壮性
-        PROJECT_ROOT = Path(__file__).resolve().parents[1]
-        mapping_file = PROJECT_ROOT / "index_base" / "url" / pname / "url_mapping.json"
-
-        if not mapping_file.exists():
-            print(f"[警告] 找不到URL映射文件，将返回原始文件名: {mapping_file}")
-            return results
-        
-        with open(mapping_file, 'r', encoding='utf-8') as f:
-            url_mapping = json.load(f)
-            
-    except Exception as e:
-        print(f"[严重错误] 加载URL映射文件失败: {e}")
-        # 如果加载失败，直接返回原始文件名，避免程序崩溃
-        return results
-
     decoded_results = []
     for item in results:
         if isinstance(item, tuple) and len(item) == 2:
             name, score = item # name 是 'img_xxxx'
+            if name.startswith("img_"):
+                try:
+                    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+                    mapping_file = PROJECT_ROOT / "index_base" / "url" / pname / "url_mapping.json"
 
-            # <<< 核心修改: 使用 .get() 方法安全地查找URL >>>
-            # 如果 name (例如 'img_0085') 在映射表中，则替换为对应的URL。
-            # 如果不在 (例如这是一个本地文件名)，则保持原样。
-            decoded_name = url_mapping.get(name, name)
-            
-            decoded_results.append((decoded_name, score))
-        else:
-            print(f"跳过无效的结果项: {item}")
+                    if not mapping_file.exists():
+                        print(f"[警告] 找不到URL映射文件，将返回原始文件名: {mapping_file}")
+                        return results
+
+                    with open(mapping_file, 'r', encoding='utf-8') as f:
+                        url_mapping = json.load(f)
+
+                except Exception as e:
+                    print(f"[严重错误] 加载URL映射文件失败: {e}")
+                    # 如果加载失败，直接返回原始文件名，避免程序崩溃
+                    return results
+                decoded_name = url_mapping.get(name, name)
+
+                decoded_results.append((decoded_name, score))
+
+            else:
+                decoded_name = "../data/base/" + name + ".jpg"  # 假设本地图片存储在 data/base/ 下
+                decoded_results.append((decoded_name, score))
             
     return decoded_results
 
