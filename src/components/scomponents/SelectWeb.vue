@@ -13,15 +13,27 @@
             <div v-for="web in webList" :key="web.id" class="web-item">
                 <label>
                     <input type="radio" :value="web.name" v-model="selectedWeb" />
-                    图源:{{ web.name }}|图源类型:{{ web.type }}|图片数量:{{ web.index_count+1 }}|
+                    图源:{{ web.name }}|图源类型:{{ web.type }}|图片数量:{{ web.index_count }}|
                 </label>
-                <!-- 如果用户是 admin，则显示删除按钮 -->
-                <a-button type="outline" @click="showConfirm(web)" v-if="role === 'admin'" size="mini" shape="round"
-                    status="danger" class="delete-btn">
+                
+                <!-- 删除按钮 -->
+                <a-button type="outline" @click="showConfirm(web)" 
+                          v-if="role === 'admin' && web.name != '答而多图图'" 
+                          size="mini" shape="round" status="danger" class="delete-btn">
                     <template #icon>
                         <icon-delete />
                     </template>
                     <template #default>Delete</template>
+                </a-button>
+                
+                <!-- 更新本地图源按钮 -->
+                <a-button type="outline" @click="updateLocal" 
+                          v-if="role === 'admin' && web.name == '答而多图图'" 
+                          size="mini" shape="round" status="warning" class="update-btn">
+                    <template #icon>
+                        <icon-sync />
+                    </template>
+                    <template #default>Update</template>
                 </a-button>
             </div>
         </div>
@@ -39,21 +51,22 @@
 <script>
 import axios from "axios";
 import { ref } from "vue";
-import { IconPlus, IconDelete } from "@arco-design/web-vue/es/icon";
+import { IconSync, IconPlus, IconDelete } from "@arco-design/web-vue/es/icon";
 
 export default {
     components: {
         IconPlus,
         IconDelete,
+        IconSync,  // 添加同步图标
     },
     props: {
         onSelectWeb: {
             type: Function,
-            required: true, // 父组件传递回调函数
+            required: true,
         },
         setMessage: {
             type: Function,
-            required: true, // 父组件传递回调函数
+            required: true,
         },
     },
     setup(props) {
@@ -61,11 +74,12 @@ export default {
         const webList = ref([]);
         const selectedWeb = ref("");
         const role = localStorage.getItem("role") || "user";
+        const updating = ref(false);  // 更新状态
 
-        // 用于删除确认弹框相关的 ref
-        const confirmVisible = ref(false);       // 是否显示确认弹框
-        const confirmInput = ref("");            // 用户输入内容
-        const currentDeleteWeb = ref(null);       // 当前准备删除的Web对象
+        // 删除确认弹框相关的 ref
+        const confirmVisible = ref(false);
+        const confirmInput = ref("");
+        const currentDeleteWeb = ref(null);
 
         const handleClick = () => {
             visible.value = true;
@@ -107,19 +121,50 @@ export default {
             }
         };
 
-        /***
-         * 点击 Delete 按钮时先弹出确认框
-         * @param {number|string} webId 要删除的 id
+        /**
+         * 更新本地图源
          */
+        const updateLocal = async () => {
+            if (updating.value) {
+                props.setMessage("正在更新中，请稍候", "warning");
+                return;
+            }
+
+            updating.value = true;
+            props.setMessage("开始更新本地图源...", "info");
+
+            try {
+                const response = await axios.post(
+                    "http://localhost:19198/getWebList/updateLocal",
+                    {},
+                    {
+                        headers: {
+                            Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        },
+                    }
+                );
+
+                if (response.data.success) {
+                    props.setMessage("本地图源更新成功", "success");
+                    // 更新成功后重新获取网站列表
+                    fetchWebList();
+                } else {
+                    props.setMessage(response.data.message || "本地图源更新失败", "error");
+                }
+            } catch (error) {
+                console.error("更新本地图源失败:", error);
+                props.setMessage("更新本地图源失败，请稍后重试", "error");
+            } finally {
+                updating.value = false;
+            }
+        };
+
         const showConfirm = (web) => {
             currentDeleteWeb.value = web;
             confirmInput.value = "";
             confirmVisible.value = true;
         };
 
-        /***
-         * 当用户在对话框中点击“确定”时，若输入框内容正好是“我确认”才去真正调用删除接口
-         */
         const confirmDelete = () => {
             if (confirmInput.value === "我确认") {
                 if (!currentDeleteWeb.value) {
@@ -130,11 +175,10 @@ export default {
                 confirmVisible.value = false;
                 currentDeleteWeb.value = null;
             } else {
-                props.setMessage("请输入正确的“我确认”才能删除", "warning");
+                props.setMessage('请输入正确的“我确认”才能删除', "warning");
             }
         };
 
-        // 点击取消或关闭弹框
         const cancelDelete = () => {
             confirmVisible.value = false;
             currentDeleteWeb.value = null;
@@ -180,6 +224,8 @@ export default {
             webList,
             selectedWeb,
             role,
+            updating,
+            updateLocal,
             showConfirm,
             confirmVisible,
             confirmInput,
@@ -236,7 +282,14 @@ export default {
     border-bottom: 1px solid #ddd;
 }
 
-.delete-btn {
-    margin-left: auto;
+.delete-btn,
+.update-btn {
+    margin-left: 10px;
+}
+
+/* 更新按钮禁用状态 */
+.update-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 </style>
