@@ -51,8 +51,8 @@ class crawler:
     一个高效、多线程的爬虫，用于查找和下载网站上的图片。
     它现在使用Selenium来处理JavaScript动态渲染的网站。
     """
-    # <<< 核心修改: 将默认爬虫线程改为1，避免竞争并提高效率
-    def __init__(self, url, name, max_images=1024, crawl_threads=1, download_threads=8, task_queue=None):
+    # <<< 核心修改: 增加 max_crawl_depth 参数
+    def __init__(self, url, name, max_images=1024, crawl_threads=1, download_threads=8, task_queue=None, max_crawl_depth=3):
         """
         初始化爬虫。
 
@@ -63,13 +63,16 @@ class crawler:
             crawl_threads (int): 爬取线程数。由于Selenium资源消耗大且为避免竞争，强烈建议设为1。
             download_threads (int): 下载线程数。
             task_queue (queue.Queue, optional): 用于通知批处理完成的任务队列。
+            max_crawl_depth (int): 最大爬取深度，防止无限递归。
         """
         self.name = name
         self.max_images = max_images
         self.root_domain = urlparse(url).netloc
         self.url_queue = Queue()
+        # <<< 关键修正: 初始化 image_queue 属性 >>>
         self.image_queue = Queue()
-        self.url_queue.put(url)
+        # <<< 修改: 队列现在存储 (URL, 深度) 元组
+        self.url_queue.put((url, 0))
         self.visited_urls = set([url])
         self.queued_image_urls = set()
         self.downloaded_image_map = []
@@ -78,6 +81,13 @@ class crawler:
         self.stop_event = threading.Event()
         self.crawl_threads_count = crawl_threads
         self.download_threads_count = download_threads
+        self.max_crawl_depth = max_crawl_depth
+        
+        # <<< 新增: 定义要忽略的URL关键词 >>>
+        self.IGNORED_PATTERNS = {
+            'login', 'register', 'signin', 'signup', 'policy', 'privacy',
+            'about', 'contact', 'faq', 'terms', 'support', 'jobs'
+        }
         
         self.task_queue = task_queue
         self.signaled_batches = set()
@@ -88,10 +98,13 @@ class crawler:
         os.makedirs(self.mapping_folder, exist_ok=True)
         self._active_crawl_threads = 0
 
+        self.host_failure_counts = {}
+        self.failure_lock = threading.Lock()
+        self.MAX_HOST_FAILURES = 5
+
     def _create_robust_session(self):
-        # 此方法依然用于下载线程，效率更高
         session = requests.Session()
-        retry_strategy = Retry(total=3, status_forcelist=[429, 500, 502, 503, 504], backoff_factor=1)
+        retry_strategy = Retry(total=2, status_forcelist=[429, 500, 502, 503, 504], backoff_factor=0.5)
         adapter = HTTPAdapter(max_retries=retry_strategy)
         session.mount('https://', adapter)
         session.mount('http://', adapter)
@@ -99,32 +112,24 @@ class crawler:
         return session
 
     def _crawl_worker(self):
-        # <<< 核心修改: 使用Selenium代替requests来获取页面内容
-        
-        # --- Selenium WebDriver 设置 ---
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument(f'user-agent={random.choice(HEADERS)["User-Agent"]}')
-        # 阻止加载图片和CSS可以加快页面加载速度
         chrome_options.add_argument("--blink-settings=imagesEnabled=false")
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"]) # 减少控制台不必要的日志
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
 
         driver = None
         try:
-            # <<< 核心修改: 使用 webdriver-manager 自动管理 ChromeDriver
-            # 这将自动下载并配置与您安装的Chrome版本匹配的驱动程序。
-            # 您不再需要手动下载和设置 'driver_path'。
             print(f"[Selenium] 线程 {threading.current_thread().name} 正在准备WebDriver...")
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
             print(f"[Selenium] 线程 {threading.current_thread().name} 的WebDriver初始化成功。")
         except Exception as e:
             print(f"[严重错误] WebDriver初始化失败: {e}")
-            print("[提示] 请确保您已安装 'webdriver-manager' (pip install webdriver-manager) 并且网络连接正常。")
-            return  # 无法启动浏览器，此线程退出
+            return
 
         with self.lock:
             self._active_crawl_threads += 1
@@ -133,7 +138,8 @@ class crawler:
 
         while not self.stop_event.is_set():
             try:
-                current_url = self.url_queue.get(timeout=5)
+                # <<< 修改: 获取URL和其对应的深度
+                current_url, current_depth = self.url_queue.get(timeout=5)
             except Empty:
                 if self.url_queue.empty(): break
                 else: continue
@@ -143,40 +149,34 @@ class crawler:
                 self.url_queue.task_done()
                 break
 
-            print(f"[爬虫线程-{threading.current_thread().name}] 正在爬取: {current_url} ...")
+            print(f"[爬虫线程-{threading.current_thread().name}] 正在爬取 (深度 {current_depth}): {current_url} ...")
 
             try:
                 driver.get(current_url)
                 
-                # <<< 核心功能增强: 模拟向下滚动以加载动态内容 >>>
                 print("[滚动] 开始模拟向下滚动页面...")
                 scroll_count = 0
-                max_scrolls = 10 # 最多滚动10次，防止无限循环
+                max_scrolls = 10
                 last_height = driver.execute_script("return document.body.scrollHeight")
 
                 while scroll_count < max_scrolls:
-                    # 检查是否已找到足够图片
                     with self.lock:
                         if len(self.queued_image_urls) >= self.max_images:
                             print("[滚动] 已找到足够数量的图片，停止滚动。")
                             break
                     
-                    # 执行滚动
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                     scroll_count += 1
                     print(f"[滚动] 完成第 {scroll_count}/{max_scrolls} 次滚动。")
                     
-                    # 等待新内容加载
-                    time.sleep(3) # 等待3秒
+                    time.sleep(3)
                     
-                    # 检查页面高度是否变化，如果没变说明已到底部
                     new_height = driver.execute_script("return document.body.scrollHeight")
                     if new_height == last_height:
                         print("[滚动] 页面高度未变，已到达底部。")
                         break
                     last_height = new_height
 
-                # 滚动结束后，获取最终的页面源代码
                 page_source = driver.page_source
                 soup = BeautifulSoup(page_source, 'html.parser')
                 
@@ -198,22 +198,31 @@ class crawler:
                 
                 print(f"[发现] 从 {current_url} (滚动后) 找到 {img_count} 张新图片。图片队列大小: {self.image_queue.qsize()}")
 
-                # 在当前页面找链接的任务可以只做一次，或者减少其权重
-                link_count = 0
-                for a_tag in soup.find_all('a', href=True):
-                    next_url = a_tag.get('href')
-                    if not next_url: continue
+                # <<< 核心修改: 只有在未达到最大深度时，才继续添加新链接 >>>
+                if current_depth < self.max_crawl_depth:
+                    link_count = 0
+                    for a_tag in soup.find_all('a', href=True):
+                        next_url = a_tag.get('href')
+                        if not next_url: continue
 
-                    next_url = urljoin(current_url, next_url).split('#')[0].split('?')[0]
+                        # <<< 新增: URL过滤逻辑 >>>
+                        if any(pattern in next_url.lower() for pattern in self.IGNORED_PATTERNS):
+                            continue # 如果URL包含黑名单关键词，则跳过
+
+                        next_url = urljoin(current_url, next_url).split('#')[0].split('?')[0]
+                        
+                        if urlparse(next_url).netloc == self.root_domain and next_url.startswith('http'):
+                            with self.lock:
+                                if next_url not in self.visited_urls:
+                                    self.visited_urls.add(next_url)
+                                    # <<< 修改: 将新URL和增加后的深度一起放入队列
+                                    self.url_queue.put((next_url, current_depth + 1))
+                                    link_count += 1
                     
-                    if urlparse(next_url).netloc == self.root_domain and next_url.startswith('http'):
-                        with self.lock:
-                            if next_url not in self.visited_urls:
-                                self.visited_urls.add(next_url)
-                                self.url_queue.put(next_url)
-                                link_count += 1
-                
-                print(f"[发现] 从 {current_url} 找到 {link_count} 个新链接。URL队列大小: {self.url_queue.qsize()}")
+                    print(f"[发现] 从 {current_url} 找到 {link_count} 个新链接 (下一深度: {current_depth + 1})。URL队列大小: {self.url_queue.qsize()}")
+                else:
+                    print(f"[信息] 已达到最大爬取深度({self.max_crawl_depth})，不再从此页面添加新链接。")
+
 
             except Exception as e:
                 print(f"[严重错误] 处理页面 {current_url} 时发生未知错误: {e}")
@@ -238,6 +247,15 @@ class crawler:
                     break
                 continue
 
+            hostname = urlparse(url).netloc
+            with self.failure_lock:
+                failure_count = self.host_failure_counts.get(hostname, 0)
+            
+            if failure_count >= self.MAX_HOST_FAILURES:
+                print(f"[熔断] 主机 {hostname} 连续失败次数过多，暂时跳过该主机的下载任务: {url}")
+                self.image_queue.task_done()
+                continue
+
             with self.lock:
                 if self.downloaded_image_count >= self.max_images:
                     self.image_queue.task_done()
@@ -245,8 +263,13 @@ class crawler:
                     continue
 
             try:
-                resp = session.get(url, timeout=20)
+                resp = session.get(url, timeout=10)
                 resp.raise_for_status()
+
+                with self.failure_lock:
+                    if self.host_failure_counts.get(hostname, 0) > 0:
+                         self.host_failure_counts[hostname] = 0
+
                 content_type = resp.headers.get('Content-Type', '').split(';')[0]
                 ext_map = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/bmp': '.bmp', 'image/webp': '.webp'}
                 file_extension = os.path.splitext(urlparse(url).path)[-1].lower()
@@ -287,9 +310,12 @@ class crawler:
                         self.stop_event.set()
 
             except requests.RequestException as e:
-                 print(f"[下载失败] URL: {url}, 原因: {e}")
+                print(f"[下载失败] URL: {url}, 原因: {e}")
+                with self.failure_lock:
+                    self.host_failure_counts[hostname] = self.host_failure_counts.get(hostname, 0) + 1
+                    print(f"[熔断计数] 主机 {hostname} 连续失败 {self.host_failure_counts[hostname]} 次。")
             except Exception as e:
-                 print(f"[严重错误] 下载时发生未知错误: {url}, 原因: {e}")
+                print(f"[严重错误] 下载时发生未知错误: {url}, 原因: {e}")
             finally:
                 self.image_queue.task_done()
         

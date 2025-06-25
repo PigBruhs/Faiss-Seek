@@ -188,7 +188,7 @@ def ApproveWeb(data):
     db=cnnect_db()
     cursor=db.cursor()
     #建立索引
-    result2=imgservice.reconstruct_index_base(name=data['name'],path_or_url=data['url'],max_imgs=300)
+    result2=imgservice.reconstruct_index_base(name=data['name'],path_or_url=data['url'],max_imgs=10000)
     print("建立索引的结果是：",result2)
     if not result2['success']:#如果建立索引失败
             db.close()
