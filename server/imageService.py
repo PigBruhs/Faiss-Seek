@@ -116,7 +116,16 @@ class ImageService:
                     fe=self.fe,
                     model=model
                 )
-            return {"success": True, "message": "本地图源更新完毕"}
+            index_counts = [len(list((index_folder / model).glob("*.index"))) for model in
+                            ["resnet50", "vgg16", "vit16"]]
+
+            if len(set(index_counts)) > 1:
+                print(f"[警告] 三个模型文件夹下的索引数量不一致: {index_counts}")
+
+            index_count = index_counts[0] if index_counts else 0
+            print(f"[服务] 本地图源更新完毕，索引数量: {index_count}")
+
+            return {"success": True, "message": f"本地图源更新完毕", "index_count": index_count}
         elif is_url:
             try:
                 print("[服务] 准备启动下载和索引双线程...")
