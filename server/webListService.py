@@ -288,4 +288,30 @@ def Delete(data):
 
 def UpdateLocalIndex():
     result=imgservice.reconstruct_index_base(path_or_url="../data/base")
-    return result
+    print("更新的结果是：",result)
+    #更新数据库数据
+    db=cnnect_db()
+    cursor=db.cursor()
+    cursor.execute(
+        '''
+        UPDATE WEBS SET index_count = ? where id = ? AND name= ?
+        '''
+        ,(result['index_count'],0,"答而多图图")
+    )
+    #查找是否修改成功
+    cursor.execute(
+        '''
+        select * FROM webs where id=? AND index_count=?
+        '''
+        ,(0,result['index_count'])
+    )
+    data=cursor.fetchone()
+    print("更新后的数据",data)
+    if not data:
+        #如果是空数据则修改失败
+        result2={'success':False,'message':"更新到数据库时失败"}
+        return result2
+    else:
+        db.commit()
+        db.close()
+        return result
