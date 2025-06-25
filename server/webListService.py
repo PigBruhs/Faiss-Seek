@@ -21,6 +21,8 @@ class WebListService:
         return Reject(data)
     def delete(self,data):
         return Delete(data)
+    def updateLocalIndex(self):
+        return UpdateLocalIndex()
 
 
 
@@ -58,6 +60,9 @@ def GetWbebList():
     if data is not None and len(data) > 0:
         print("获取到了数据库数据：", data)
         # 将数据转化为字典
+        if not data[0][1]=="答而多图图":
+            #判断第一个是不是本地图源
+            print("第一个图源非本地图源，数据库结构有问题")
         for i in data:
             j = {
                 "id": i[0],
@@ -71,7 +76,40 @@ def GetWbebList():
         result = {"success": True, "webList": webList}
         return result
     else:
-        result = {'success': False, "webList": []}  # 改为空数组而不是空对象
+        #没有数据时，插入第一条数据为本地图源
+        cursor.execute(
+        '''
+        INSERT INTO WEBS VALUES(?,?,?,?,?,?,?,?)
+        '''
+        ,(0,"答而多图图","本地图片网站","/data/base","本地图源",1,1,0)
+     )
+        #检索数据插入是否成功
+        cursor.execute(
+        '''
+        SELECT id, name, type, index_count FROM webs WHERE is_approved=1
+        '''
+    )
+    
+        print("如果数据库不存在则创建数据库")
+        data = cursor.fetchall()
+        webList = []
+        if data is not None and len(data)> 0:
+             # 将数据转化为字典
+          if not data[0][1]=="答而多图图":
+            #判断第一个是不是本地图源
+            print("第一个图源非本地图源，数据库结构有问题")
+          for i in data:
+            j = {
+                "id": i[0],
+                "name": i[1],
+                "type": i[2],
+                "index_count": i[3]  # 现在i[3]是有效的，因为查询包含了4个字段
+            }
+            webList.append(j)
+            result = {'success': True, "webList": webList}  # 改为空数组而不是空对象
+            return result
+        else:
+             result = {'success': False, "webList": []}
         db.close()
         return result
     
@@ -246,3 +284,11 @@ def Delete(data):
         result={'success':False,'message':"删除失败，图源不存在或权限不足"}
         db.close()
         return result
+    
+
+def UpdateLocalIndex():
+    result={'success':True,'message':"图源更新成功"}
+    result2=imgservice.reconstruct_index_base(path_or_url="/data/base")
+    if not result2['success']:#重构失败则返回相应的信息
+        return result2
+    return result

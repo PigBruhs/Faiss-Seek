@@ -388,7 +388,44 @@ def deletetWeb():
         # 如果 Token 验证成功
         data=request.get_json()
         print("获取到的数据：",data)
+        if data['id']==0 and data['name']=='答而多图图':
+            print("本地图源无法删除")
+            return jsonify({
+            "success":False,
+            "message": '本地图源无法删除'
+        }), 400
         result=webListService.delete(data)
+        print("获取的结果是：",result)
+        if result['success']:
+            return jsonify({
+            "success": result["success"],
+            "message": result['message']
+        }), 200
+        else:
+            return jsonify({
+            "success": result["success"],
+            "message": result['message']
+        }), 400
+@app.route('/deleteWeb', methods=['GET'])
+def updateLocal():
+    auth_header = request.headers.get('Authorization')
+    print("Authorization:", auth_header)
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({
+            "success": False,
+            "message": "缺少或无效的 Token"
+        }), 401
+
+    token = auth_header.split(" ")[1]  # 提取 Token
+    # 验证 Token（示例代码，实际需要根据你的逻辑验证 Token）
+    tokenResult=tokenService.isAdmin(token)
+    if not tokenResult:
+        return jsonify({
+            "success": False,
+            "message": "Token 无效或已过期"
+        }), 401
+    else:
+        result=webListService.updateLocalIndex()
         print("获取的结果是：",result)
         if result['success']:
             return jsonify({
