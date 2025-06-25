@@ -1,5 +1,6 @@
 <template>
   <a-image
+  referrerpolicy="no-referrer"
     :src="imageSrc1"
     :title="truncatedTitle"
     :description="imageDescription"
@@ -22,7 +23,7 @@
   </a-image>
 </template>
 <script>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { IconEye, IconDownload, IconInfoCircle } from '@arco-design/web-vue/es/icon';
 
 export default {

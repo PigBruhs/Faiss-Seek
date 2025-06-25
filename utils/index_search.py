@@ -12,46 +12,51 @@ from utils.feature_extraction import feature_extractor
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'#这里似乎是因为我电脑上跑着两个pytorch导致它报的不安全。实际情况应该不会用到
 
 
-def decoder_ring(pname, results):
+def decoder_ring(pname: str, results: list[tuple]) -> list[tuple]:
     """
-    将搜索结果中的图片编号转换为原始URL
+    将搜索结果中的图片编号(如 'img_0085') 转换为其原始URL。
 
-    参数:
-        pname: 项目名称
-        results: 搜索结果列表，格式为[(文件名, 相似度分数),...]
-    返回:
-        解码后的结果列表，同样格式
+    <<< 核心修改: 修正了URL的解码逻辑 >>>
+
+    Args:
+        pname (str): 项目名称 (例如 'pixnio')。
+        results (list): 搜索结果列表，格式为 [('img_0085', 0.54), ...]。
+
+    Returns:
+        list: 解码后的结果列表，格式为 [('http://...', 0.54), ...]。
     """
+    # 构造一次映射文件的路径，避免在循环中重复构造
+    try:
+        # 使用 Pathlib 提高路径操作的健壮性
+        PROJECT_ROOT = Path(__file__).resolve().parents[1]
+        mapping_file = PROJECT_ROOT / "index_base" / "url" / pname / "url_mapping.json"
+
+        if not mapping_file.exists():
+            print(f"[警告] 找不到URL映射文件，将返回原始文件名: {mapping_file}")
+            return results
+        
+        with open(mapping_file, 'r', encoding='utf-8') as f:
+            url_mapping = json.load(f)
+            
+    except Exception as e:
+        print(f"[严重错误] 加载URL映射文件失败: {e}")
+        # 如果加载失败，直接返回原始文件名，避免程序崩溃
+        return results
+
     decoded_results = []
     for item in results:
-        # 确保item是(name, score)格式的元组
         if isinstance(item, tuple) and len(item) == 2:
-            name, score = item
+            name, score = item # name 是 'img_xxxx'
 
-            # 判断是否为URL编号格式
-            if isinstance(name, str) and name.startswith("url_") and "." in name:
-                try:
-                    # 提取编号
-                    image_idx = name.split("_")[1].split(".")[0]
-                    
-                    # 使用项目根目录作为基准
-                    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    index_base_path = os.path.join(PROJECT_ROOT, "index_base", "url", pname)
-                    mapping_file = os.path.join(index_base_path, "url_mapping.json")
-
-                    if os.path.exists(mapping_file):
-                        with open(mapping_file, 'r', encoding='utf-8') as f:
-                            url_mapping = json.load(f)
-                            if image_idx in url_mapping:
-                                name = url_mapping[image_idx]
-                except Exception as e:
-                    print(f"解码URL失败: {e}")
-
-            # 添加解码后的结果，保持元组格式
-            decoded_results.append((name, score))
+            # <<< 核心修改: 使用 .get() 方法安全地查找URL >>>
+            # 如果 name (例如 'img_0085') 在映射表中，则替换为对应的URL。
+            # 如果不在 (例如这是一个本地文件名)，则保持原样。
+            decoded_name = url_mapping.get(name, name)
+            
+            decoded_results.append((decoded_name, score))
         else:
-            print(f"跳过无效结果项: {item}")
-
+            print(f"跳过无效的结果项: {item}")
+            
     return decoded_results
 
 
