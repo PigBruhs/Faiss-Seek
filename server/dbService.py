@@ -12,4 +12,4 @@ def cnnect_db():
     db = sqlite3.connect(db_path)
     #db.row_factory = sqlite3.Row
     #不转换为row对象，fetchall得到的数据方便转化为json格式
-    return db
+    return sqlite3.connect(db_path, timeout=60.0)

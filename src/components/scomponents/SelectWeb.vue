@@ -134,9 +134,8 @@ export default {
             props.setMessage("开始更新本地图源...", "info");
 
             try {
-                const response = await axios.post(
-                    "http://localhost:19198/getWebList/updateLocal",
-                    {},
+                const response = await axios.get(
+                    "http://localhost:19198/updateLocal",
                     {
                         headers: {
                             Authorization: `Bearer ${localStorage.getItem("token")}`,

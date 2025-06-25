@@ -288,7 +288,7 @@ def Delete(data):
 
 def UpdateLocalIndex():
     result={'success':True,'message':"图源更新成功"}
-    result2=imgservice.reconstruct_index_base(path_or_url="/data/base")
+    result2=imgservice.reconstruct_index_base(path_or_url="../data/base")
     if not result2['success']:#重构失败则返回相应的信息
         return result2
     return result

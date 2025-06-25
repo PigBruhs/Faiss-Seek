@@ -406,7 +406,7 @@ def deletetWeb():
             "success": result["success"],
             "message": result['message']
         }), 400
-@app.route('/deleteWeb', methods=['GET'])
+@app.route('/updateLocal', methods=['GET'])
 def updateLocal():
     auth_header = request.headers.get('Authorization')
     print("Authorization:", auth_header)

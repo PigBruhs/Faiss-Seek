@@ -116,7 +116,7 @@ class ImageService:
                     fe=self.fe,
                     model=model
                 )
-            return {"success": False, "message": "本地图源更新完毕"}
+            return {"success": True, "message": "本地图源更新完毕"}
         elif is_url:
             try:
                 print("[服务] 准备启动下载和索引双线程...")
@@ -157,7 +157,11 @@ class ImageService:
             import traceback
             traceback.print_exc()
             return {"success": False, "message": f"{name} 索引库重建失败: {str(e)}", "index_count": -1}
-        return None
+        return {
+        "success": False,
+        "message": f"提供的路径 '{path_or_url}' 不是有效的URL且在本地不存在 (Path '{path_or_url}' is not a valid URL and does not exist locally.)",
+        "index_count": -1
+        }
 
     # ... (destroy_index_base 和 img_search 方法无需修改) ...
     def destroy_index_base(self,name=None):
