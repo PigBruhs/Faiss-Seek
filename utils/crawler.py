@@ -5,25 +5,20 @@ import random
 import json
 import threading
 from urllib.parse import urlparse, urljoin
-from queue import Queue, Empty
+# <<< 核心修正: 同时导入 PriorityQueue 和 Queue >>>
+from queue import PriorityQueue, Queue, Empty
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import time
 import re
 
-# <<< 新增: 导入Selenium相关模块
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import WebDriverException, TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-# <<< 核心修改: 导入webdriver-manager，用于自动管理ChromeDriver
+from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
 # --- 常量和设置 ---
-# 更新HEADERS，使用更真实的浏览器头部
 HEADERS = [
     {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -51,28 +46,16 @@ class crawler:
     一个高效、多线程的爬虫，用于查找和下载网站上的图片。
     它现在使用Selenium来处理JavaScript动态渲染的网站。
     """
-    # <<< 核心修改: 增加 max_crawl_depth 参数
-    def __init__(self, url, name, max_images=1024, crawl_threads=1, download_threads=8, task_queue=None, max_crawl_depth=3):
-        """
-        初始化爬虫。
-
-        Args:
-            url (str): 起始URL。
-            name (str): 会话名称。
-            max_images (int): 最大图片数。
-            crawl_threads (int): 爬取线程数。由于Selenium资源消耗大且为避免竞争，强烈建议设为1。
-            download_threads (int): 下载线程数。
-            task_queue (queue.Queue, optional): 用于通知批处理完成的任务队列。
-            max_crawl_depth (int): 最大爬取深度，防止无限递归。
-        """
+    def __init__(self, url, name, max_images=1024, crawl_threads=1, download_threads=4, task_queue=None, max_crawl_depth=2):
         self.name = name
         self.max_images = max_images
         self.root_domain = urlparse(url).netloc
-        self.url_queue = Queue()
-        # <<< 关键修正: 初始化 image_queue 属性 >>>
+        # 使用优先队列处理URL，确保高价值页面被优先访问
+        self.url_queue = PriorityQueue()
+        self.url_queue.put((0, 0, url)) # (优先级, 深度, URL)
+        # 使用标准队列处理图片URL
         self.image_queue = Queue()
-        # <<< 修改: 队列现在存储 (URL, 深度) 元组
-        self.url_queue.put((url, 0))
+        
         self.visited_urls = set([url])
         self.queued_image_urls = set()
         self.downloaded_image_map = []
@@ -83,24 +66,35 @@ class crawler:
         self.download_threads_count = download_threads
         self.max_crawl_depth = max_crawl_depth
         
-        # <<< 新增: 定义要忽略的URL关键词 >>>
+        # URL关键词黑名单，避免爬取无用页面
         self.IGNORED_PATTERNS = {
             'login', 'register', 'signin', 'signup', 'policy', 'privacy',
-            'about', 'contact', 'faq', 'terms', 'support', 'jobs'
+            'about', 'contact', 'faq', 'terms', 'support', 'jobs', 'profile',
+            'password', 'account', 'upload', 'cart', 'checkout', 'forum',
+            '/ar/', '/de/', '/es/', '/fr/', '/it/', '/ja/', '/ko/', '/pt/', 
+            '/ru/', '/zh/', '/pl/', '/nl/', '/sv/', '/tr/', '/cs/', '/da/',
+            '/fi/', '/hu/', '/no/', '/ro/', '/sk/', '/th/',
+            '/blog/', '/news/', '/article/'
         }
+        # 高优先级URL关键词
+        self.PRIORITY_PATTERNS = {'photo', 'image', 'gallery', 'album', 'media'}
         
         self.task_queue = task_queue
         self.signaled_batches = set()
-
         self.crawled_images_dir = os.path.join(PROJECT_ROOT, "crawled_images", self.name)
         self.mapping_folder = os.path.join(PROJECT_ROOT, "index_base", "url", self.name)
         os.makedirs(self.crawled_images_dir, exist_ok=True)
         os.makedirs(self.mapping_folder, exist_ok=True)
         self._active_crawl_threads = 0
 
+        # 熔断机制属性
         self.host_failure_counts = {}
         self.failure_lock = threading.Lock()
         self.MAX_HOST_FAILURES = 5
+
+        # 爬虫空闲超时机制属性
+        self.last_image_found_time = time.time()
+        self.CRAWL_IDLE_TIMEOUT = 60 # 秒
 
     def _create_robust_session(self):
         session = requests.Session()
@@ -138,18 +132,20 @@ class crawler:
 
         while not self.stop_event.is_set():
             try:
-                # <<< 修改: 获取URL和其对应的深度
-                current_url, current_depth = self.url_queue.get(timeout=5)
+                priority, current_depth, current_url = self.url_queue.get(timeout=5)
             except Empty:
+                if time.time() - self.last_image_found_time > self.CRAWL_IDLE_TIMEOUT:
+                    print(f"[超时] 爬虫已空闲超过 {self.CRAWL_IDLE_TIMEOUT} 秒，可能已完成或陷入困境，准备退出。")
+                    self.stop_event.set()
                 if self.url_queue.empty(): break
                 else: continue
-
+            
             if self.downloaded_image_count >= self.max_images:
                 self.stop_event.set()
                 self.url_queue.task_done()
                 break
 
-            print(f"[爬虫线程-{threading.current_thread().name}] 正在爬取 (深度 {current_depth}): {current_url} ...")
+            print(f"[爬虫线程-{threading.current_thread().name}] 正在爬取 (深度 {current_depth}, 优先级 {priority}): {current_url} ...")
 
             try:
                 driver.get(current_url)
@@ -158,19 +154,14 @@ class crawler:
                 scroll_count = 0
                 max_scrolls = 10
                 last_height = driver.execute_script("return document.body.scrollHeight")
-
                 while scroll_count < max_scrolls:
                     with self.lock:
                         if len(self.queued_image_urls) >= self.max_images:
                             print("[滚动] 已找到足够数量的图片，停止滚动。")
                             break
-                    
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                     scroll_count += 1
-                    print(f"[滚动] 完成第 {scroll_count}/{max_scrolls} 次滚动。")
-                    
                     time.sleep(3)
-                    
                     new_height = driver.execute_script("return document.body.scrollHeight")
                     if new_height == last_height:
                         print("[滚动] 页面高度未变，已到达底部。")
@@ -179,62 +170,62 @@ class crawler:
 
                 page_source = driver.page_source
                 soup = BeautifulSoup(page_source, 'html.parser')
-                
-                print(f"[调试] 页面 '{soup.title.string if soup.title else '无标题'}' 的内容长度为 {len(page_source)} 字符。")
 
                 img_count = 0
                 for img in soup.find_all('img'):
                     src = img.get('src') or img.get('data-src')
                     if not src or src.startswith('data:image'): continue
-                    
                     img_url = urljoin(current_url, src)
-
                     if any(ext in img_url.lower() for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']):
                         with self.lock:
                             if len(self.queued_image_urls) < self.max_images and img_url not in self.queued_image_urls:
                                 self.queued_image_urls.add(img_url)
                                 self.image_queue.put(img_url)
                                 img_count += 1
+                                self.last_image_found_time = time.time()
                 
                 print(f"[发现] 从 {current_url} (滚动后) 找到 {img_count} 张新图片。图片队列大小: {self.image_queue.qsize()}")
 
-                # <<< 核心修改: 只有在未达到最大深度时，才继续添加新链接 >>>
                 if current_depth < self.max_crawl_depth:
                     link_count = 0
                     for a_tag in soup.find_all('a', href=True):
-                        next_url = a_tag.get('href')
-                        if not next_url: continue
-
-                        # <<< 新增: URL过滤逻辑 >>>
-                        if any(pattern in next_url.lower() for pattern in self.IGNORED_PATTERNS):
-                            continue # 如果URL包含黑名单关键词，则跳过
-
-                        next_url = urljoin(current_url, next_url).split('#')[0].split('?')[0]
+                        next_url_raw = a_tag.get('href')
+                        if not next_url_raw: continue
                         
-                        if urlparse(next_url).netloc == self.root_domain and next_url.startswith('http'):
+                        if any(pattern in next_url_raw.lower() for pattern in self.IGNORED_PATTERNS):
+                            continue
+
+                        next_url = urljoin(current_url, next_url_raw).split('#')[0].split('?')[0]
+                        
+                        # <<< 最终修复: 智能分拣URL，防止图片URL进入爬取队列 >>>
+                        is_image_link = any(ext in next_url.lower() for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif'])
+
+                        if is_image_link:
+                            # 如果是图片链接，直接放入下载队列
+                            with self.lock:
+                                if len(self.queued_image_urls) < self.max_images and next_url not in self.queued_image_urls:
+                                    self.queued_image_urls.add(next_url)
+                                    self.image_queue.put(next_url)
+                        elif urlparse(next_url).netloc == self.root_domain and next_url.startswith('http'):
+                             # 如果是普通网页链接，才放入爬取队列
                             with self.lock:
                                 if next_url not in self.visited_urls:
                                     self.visited_urls.add(next_url)
-                                    # <<< 修改: 将新URL和增加后的深度一起放入队列
-                                    self.url_queue.put((next_url, current_depth + 1))
+                                    priority = 0 if any(p in next_url.lower() for p in self.PRIORITY_PATTERNS) else 1
+                                    self.url_queue.put((priority, current_depth + 1, next_url))
                                     link_count += 1
                     
-                    print(f"[发现] 从 {current_url} 找到 {link_count} 个新链接 (下一深度: {current_depth + 1})。URL队列大小: {self.url_queue.qsize()}")
+                    print(f"[发现] 从 {current_url} 找到 {link_count} 个新链接。URL队列大小: {self.url_queue.qsize()}")
                 else:
                     print(f"[信息] 已达到最大爬取深度({self.max_crawl_depth})，不再从此页面添加新链接。")
-
 
             except Exception as e:
                 print(f"[严重错误] 处理页面 {current_url} 时发生未知错误: {e}")
             finally:
                 self.url_queue.task_done()
         
-        if driver:
-            driver.quit()
-        
-        with self.lock:
-            self._active_crawl_threads -= 1
-        
+        if driver: driver.quit()
+        with self.lock: self._active_crawl_threads -= 1
         print(f"[爬虫线程-{threading.current_thread().name}] 已退出。剩余活跃爬虫线程: {self._active_crawl_threads}")
 
     def _download_worker(self):
@@ -277,7 +268,6 @@ class crawler:
                     file_extension = ext_map.get(content_type)
                 
                 if not file_extension:
-                    print(f"[跳过] 无法确定图片类型: {url} (Content-Type: {content_type})")
                     self.image_queue.task_done()
                     continue
 
@@ -303,7 +293,6 @@ class crawler:
                         is_last_image = (current_count == self.max_images)
                         
                         if self.task_queue and (is_batch_full or is_last_image) and current_batch_num not in self.signaled_batches:
-                            print(f"[通知] 批次 {current_batch_num} 已准备好，通知索引线程...")
                             self.task_queue.put(current_batch_num)
                             self.signaled_batches.add(current_batch_num)
                     else:
@@ -313,7 +302,6 @@ class crawler:
                 print(f"[下载失败] URL: {url}, 原因: {e}")
                 with self.failure_lock:
                     self.host_failure_counts[hostname] = self.host_failure_counts.get(hostname, 0) + 1
-                    print(f"[熔断计数] 主机 {hostname} 连续失败 {self.host_failure_counts[hostname]} 次。")
             except Exception as e:
                 print(f"[严重错误] 下载时发生未知错误: {url}, 原因: {e}")
             finally:
@@ -358,19 +346,27 @@ class crawler:
     def save_image(self):
         mapping_file = os.path.join(self.mapping_folder, "url_mapping.json")
         url_mapping = {}
-        if os.path.exists(mapping_file):
+        
+        with self.lock:
             try:
-                with open(mapping_file, 'r', encoding='utf-8') as f:
-                    url_mapping = json.load(f)
-            except json.JSONDecodeError: pass
-        
-        for idx, url in self.downloaded_image_map:
-            url_mapping[idx] = url
-        
-        with open(mapping_file, 'w', encoding='utf-8') as f:
-            json.dump(url_mapping, f, ensure_ascii=False, indent=2)
-        
-        print(f"URL 映射文件已更新/保存至: {mapping_file}")
+                if os.path.exists(mapping_file):
+                    with open(mapping_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        if content:
+                            url_mapping = json.loads(content)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"[警告] 读取现有映射文件失败: {e}。将创建一个新的映射文件。")
+                url_mapping = {}
+
+            for idx, url in self.downloaded_image_map:
+                url_mapping[idx] = url
+            
+            try:
+                with open(mapping_file, 'w', encoding='utf-8') as f:
+                    json.dump(url_mapping, f, ensure_ascii=False, indent=4)
+                print(f"URL 映射文件已成功更新/保存至: {mapping_file}")
+            except IOError as e:
+                print(f"[严重错误] 写入URL映射文件失败: {e}")
 
     def decoder(self):
         mapping_file = os.path.join(self.mapping_folder, "url_mapping.json")
