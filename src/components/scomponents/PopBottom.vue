@@ -25,7 +25,7 @@ const items = [
   {
     title: 'Vit-B-16',
     icon: '//iconfont.alicdn.com/p/illus_3d/file/ZsWruISgVCKK/ec58813a-76ab-4735-8075-a1e99da18859.png',
-    content: 'Vit-B-16 是一个用于图像分类的深度学习模型，具有较高的准确率和效率。',
+    content: 'Vit-B-16 是一个用于图像分类的深度学习模型，具有较高的准确率和效率，仅适用于低分辨率图像。',
   },
   {
     title: 'resnet50',
