@@ -252,6 +252,9 @@ e:\软件实训开发\答而多图图
 - 检查并安装 Python 和 Node.js 环境
 - 创建 Python 虚拟环境并安装后端依赖（`server/requirements.txt`）
 - 安装前端依赖（`npm install`）
+- 下载预训练模型（vit16,resnet50,vgg16）并放入/pretrained 文件夹下
+- 下载与本地 Chrome 浏览器版本匹配的 ChromeDriver。
+- 以及其他需要手动安装的依赖
 
 ### 2. 启动项目
 
